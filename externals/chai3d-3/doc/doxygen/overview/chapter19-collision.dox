@@ -1,0 +1,94 @@
+//===========================================================================
+/*
+    Software License Agreement (BSD License)
+    Copyright (c) 2003-2023, CHAI3D
+    (www.chai3d.org)
+
+    All rights reserved.
+*/
+//===========================================================================
+ 
+/*! 
+
+
+\page chapter19-collision Mouse Selection
+
+\section section19-1 Introduction
+
+Mouse picking is an often used, intuitive operation to interact with 3D 
+scenes in a variety of 3D graphics applications. CHAI3D provides some basic 
+capabilities to detect if an object has been selected. The mouse selection 
+procedure requires first setting up a collision recorder and the desired 
+collision settings. The following listing illustrate a basic example.
+
+
+@code
+
+	using namespace chai3d;
+
+	cCollisionRecorder recorder;
+	cCollisionSettings settings;
+
+	// detect for any collision between mouse and scene
+	bool hit = camera->select(x, y, windowWidth, windowHeight, recorder, settings);
+
+@endcode
+
+
+The collision recorder is empty at first and accumulates the selected objects 
+located underneath the mouse pointer. The information returned for each 
+collision event is stored in a \link chai3d::cCollisionEvent cCollisionEvent\endlink structure. Such 
+structure will contain a pointer to the object, 3D position information of 
+the mouse click, selected triangle (\link chai3d::cMesh cMesh\endlink), and surface normal.
+
+Collision settings can be setup to filter certain types of data or to speed 
+up the procedure. 
+
+
+
+\section section19-2 Example
+
+\image html images/fig-mouse-click.png "Example 07-mouse-select: The operator can select and move an object with the mouse."
+
+In the following listing extracted from example <b>12-polygon</b>, a mouse click 
+callback is programmed. If a triangle from a mesh object is selected, its 
+vertices a painted in red.
+
+
+@code
+
+	using namespace chai3d;
+
+	void mouseClick(int button, int state, int x, int y)
+	{
+    	// mouse button down
+    	if (state == GLUT_DOWN)
+    	{
+        	cCollisionRecorder recorder;
+        	cCollisionSettings settings;
+
+	        // detect for any collision between mouse and scene
+    	    bool hit = camera->select(x, y, windowW, windowH, recorder, settings);
+        	if (hit)
+	        {
+    	        // set color to red
+        	    cColorf color;
+            	color.setRed();
+
+	            // retrieve triangle selected by mouse
+    	        cTriangle* triangle = recorder.m_nearestCollision.m_triangle;
+        	    if (triangle != NULL)
+            	{
+	                // paint each vertex with the selected color
+    	            triangle->getVertex0()->setColor(color);
+        	        triangle->getVertex1()->setColor(color);
+            	    triangle->getVertex2()->setColor(color);
+	            }
+    	    }
+	    }
+	}
+
+@endcode
+
+
+*/

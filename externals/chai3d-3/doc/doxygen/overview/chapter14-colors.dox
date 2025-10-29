@@ -1,0 +1,259 @@
+//===========================================================================
+/*
+    Software License Agreement (BSD License)
+    Copyright (c) 2003-2023, CHAI3D
+    (www.chai3d.org)
+
+    All rights reserved.
+*/
+//===========================================================================
+ 
+/*! 
+
+
+\page chapter14-colors Colors
+
+
+
+
+\section section14-1 Introduction
+
+Color is the visual perceptual property corresponding in humans to the categories 
+called red, blue, yellow, green and others. Color derives from the spectrum of 
+light (distribution of light power versus wavelength) interacting in the eye with
+the spectral sensitivities of the light receptors. Color categories and physical 
+specifications of color are also associated with objects, materials, light sources, 
+etc., based on their physical properties such as light absorption, reflection, 
+or emission spectra. By defining a color space, colors can be identified 
+numerically by their coordinates.
+
+
+
+
+\section section14-2 RGB Color Space
+
+The RGB color model is an additive color model in which red, green, and blue light 
+are added together in various ways to reproduce a broad array of colors. The name 
+of the model comes from the initials of the three additive primary colors, red, 
+green, and blue. The main purpose of the RGB color model is for the sensing, 
+representation, and display of images in electronic systems, such as televisions 
+and computers. To form a color with RGB, three colored light beams (one red, one 
+green, and one blue) must be superimposed (for example by emission from a black 
+screen, or by reflection from a white screen). Each of the three beams is called 
+a component of that color, and each of them can have an arbitrary intensity, from 
+fully off to fully on, in the mixture. The RGB color model is additive in the 
+sense that the three light beams are added together, and their light spectra add, 
+wavelength for wavelength, to make the final color's spectrum.
+
+\image html images/fig-color-rgb.png "Additive color mixing: adding red to green yields yellow; adding all three primary colors together yields white."
+
+Zero intensity for each component gives the darkest color (no light, considered
+black), and full intensity of each gives a white; the quality of this white 
+depends on the nature of the primary light sources, but if they are properly 
+balanced, the result is a neutral white matching the system's white point. When 
+the intensities for all the components are the same, the result is a shade of 
+gray, darker or lighter depending on the intensity. When the intensities are 
+different, the result is a colorized hue, more or less saturated depending on 
+the difference of the strongest and weakest of the intensities of the primary colors 
+employed.
+
+When one of the components has the strongest intensity, the color is a hue near 
+this primary color (reddish, greenish, or bluish), and when two components have 
+the same strongest intensity, then the color is a hue of a secondary color 
+(a shade of cyan, magenta or yellow). A secondary color is formed by the sum of 
+two primary colors of equal intensity: cyan is green+blue, magenta is red+blue, 
+and yellow is red+green. Every secondary color is the complement of one primary color; 
+when a primary and its complementary secondary color are added together, the result 
+is white: cyan complements red, magenta complements green, and yellow complements blue.
+
+The RGB color model itself does not define what is meant by red, green, and blue 
+colorimetrically, and so the results of mixing them are not specified as absolute, 
+but relative to the primary colors. 
+
+
+
+\section section14-3 RGBA Color Space
+
+RGBA stands for red green blue alpha. While it is sometimes described as a color 
+space, it is actually simply a use of the RGB color model, with extra information. 
+The color is RGB, and may belong to any RGB color space, but an integral alpha value 
+enables alpha compositing. 
+
+The alpha channel is normally used as an opacity channel. If a pixel has a value 
+of 0\% in its alpha channel, it is fully transparent (and, thus, invisible), whereas 
+a value of 100\% in the alpha channel gives a fully opaque pixel 
+(traditional digital images). Values between 0\% and 100\% make it possible 
+for pixels to show through a background like a glass (translucency), an effect 
+not possible with simple binary (transparent or opaque) transparency. 
+PNG is an image format that uses RGBA.
+
+\image html images/fig-color-rgba.jpg "The spectrum of RGBA colors."
+
+
+
+
+\section section14-4 Colors in CHAI3D
+
+
+CHAI3D offers two different data structures for representing colors using the RGBA 
+definition. These structures are defined as \ref chai3d::cColorb "cColorb" and 
+\ref chai3d::cColorf "cColorf", and both of them store each of the four 
+color components RGBA in a four cell array named <c>m_color[4]</c>. The only difference 
+between the two formats resides in their numerical representation: \ref chai3d::cColorb "cColorb"
+uses a byte for each color component (0x00-0xff), whereas \ref chai3d::cColorf "cColorf" uses a float (0.0-1.0).
+
+
+\subsection subsection14-4-1 Definition
+
+A color is defined by at least setting the three (RGB) components, with the an optional 
+alpha (A) component. If the alpha component is omitted, then a value of 1.0 or 0xff is 
+stored by default.
+
+
+@code
+
+	using namespace chai3d;
+
+	// defining a cColorb type color
+	cColorb color;
+	color.set(10, 47, 120);   
+
+	// defining a cColorf type color
+	cColorf color;
+	color.set(0.4, 0.3, 0.8); 
+
+@endcode
+
+
+Each color component may also be modified or accessed independently:
+
+
+@code
+
+    using namespace chai3d;
+	
+	// reading RGBA components
+	GLFloat r = color.getR(); 
+	GLFloat g = color.getG(); 
+	GLFloat b = color.getB(); 
+	GLFloat a = color.getA(); 
+
+	// modifying RGBA components
+	color.setR(0.1);
+	color.setG(0.2);
+	color.setB(0.3);
+	color.setA(1.0);
+
+@endcode
+
+
+
+\subsection subsection14-4-2 Format Conversion
+
+Colors may also be converted from one format to the other:
+
+
+@code
+
+    using namespace chai3d;
+
+	// definition
+	cColorf colorA;
+	cColorb colorB;
+
+	// convert color from FLOAT format to BYTE format
+	colorA->copyTo(colorB);
+
+	// convert color from BYTE format to FLOAT format
+	colorB->copyTo(colorA);
+
+@endcode
+
+
+
+\subsection subsection14-4-3 Gray Scale
+
+Gray scale colors can be assigned by programming the desired luminance value. Values 
+range from 0.0 (black) to 1.0 (white) for the \ref chai3d::cColorf "cColorf" representation, and 
+0 to 255 for \ref chai3d::cColorb "cColorb":  
+
+
+@code
+
+    using namespace chai3d;
+	
+	// set luminance value
+	color->setLuminance(0.8)
+
+	// get luminance value
+	GLfloat luminance = color->getLuminance();
+
+@endcode
+
+
+
+\subsection subsection14-4-4 Color Palette
+
+To make the color assignment more intuitive, CHAI3D offers a list of predefined colors 
+from the CSS3 specification. The color palette color, along with hexadecimal and decimal 
+equivalents, is shown in the following figure.
+
+
+@code
+
+	using namespace chai3d;
+
+	// definition
+	cColorf color;
+
+	// assign color by name (royal blue)
+	color.setBlueRoyal();    
+
+	// assign color by name (pure white)
+	color.setWhite(); 
+
+	// assign color by name (olive green)
+	color.setGreenOlive();
+
+	// assign a level of gray. similar to setLuminance() method.
+	color.setGrayLevel(0.5);
+
+@endcode
+
+ 
+\image html images/fig-color-palette.jpg "CHAI3D color palette."
+
+
+
+
+\section section14-5 Colors and Objects
+
+Colors are used throughout CHAI3D to describe image pixels, vertex colors, materials, 
+or lighting properties. The \ref chai3d::cColorf "cColorf" format is typically 
+used for 3D data objects (vertices, materials, lights), whereas the byte representation 
+\ref chai3d::cColorb "cColorb" is the format of choice for bitmap images and 
+textures. Here are several examples where colors adjusted for a 2D and 3D object
+in a scene:   
+
+
+@code
+
+	using namespace chai3d;
+
+	// get color of image pixel at position (x,y)
+	cColorb color;
+	image->getPixelColor(x, y, color);
+
+	// set the color of a vertex
+	cColorf color;
+	color.setRed();
+	vertex->setColor(color);
+
+	// adjust the ambient color component of a light source
+	light->m_ambient.set(0.1, 0.1, 0.1);
+
+@endcode
+
+
+
+*/

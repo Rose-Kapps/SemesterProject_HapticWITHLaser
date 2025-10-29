@@ -1,0 +1,67 @@
+//===========================================================================
+/*
+    Software License Agreement (BSD License)
+    Copyright (c) 2003-2023, CHAI3D
+    (www.chai3d.org)
+
+    All rights reserved.
+*/
+//===========================================================================
+ 
+/*! 
+
+
+\page chapter10-points Point Clouds
+
+
+
+\section section10-1 Introduction
+
+A point cloud is a set of data points in a three-dimensional coordinate system. 
+In CHAI3D, these points are defined by X, Y, and Z coordinates, and often are 
+intended to represent the external surface of an object.
+
+Point clouds may be created by 3D scanners. These devices measure a large number 
+of points on an object's surface, and often output a point cloud as a data file. 
+The point cloud represents the set of points that the device has measured. 
+
+
+
+\section section10-2 Point Cloud Objects
+
+\image html images/fig-model-points.png "Point cloud object."
+
+Similar to mesh objects, point cloud models use vertices to describe all the points 
+that compose the cloud. A finger-proxy algorithm is also used to compute all
+the interaction forces between the haptic tool and the object. A collision
+detection must also be initialized after all points have been created.
+
+
+@code
+
+    using namespace chai3d;
+	
+    // create a virtual mesh
+    cloud = new cMultiPoint();
+
+    // add object to world
+    world->addChild(cloud);
+
+    // load point cloud
+    cloud->loadFromFile("myPointCloud.obj");
+
+    // create collision detector
+    cloud->createAABBCollisionDetector(toolRadius);
+
+    // set point size for graphic rendering
+    cloud->setPointSize(5.0);
+
+    // set haptic stiffness
+    cloud->setStiffness(0.2 * maxStiffness, true);
+
+    // enable display list for faster graphic rendering
+    cloud->setUseDisplayList(true);
+
+@endcode
+
+*/

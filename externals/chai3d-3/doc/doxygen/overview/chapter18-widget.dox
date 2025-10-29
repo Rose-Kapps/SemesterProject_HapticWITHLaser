@@ -1,0 +1,359 @@
+//===========================================================================
+/*
+    Software License Agreement (BSD License)
+    Copyright (c) 2003-2023, CHAI3D
+    (www.chai3d.org)
+
+    All rights reserved.
+*/
+//===========================================================================
+ 
+/*! 
+
+
+\page chapter18-widget Widgets
+
+
+\section section18-1 Introduction
+
+In CHAI3D widgets are the primary elements for displaying data and status 
+information in 2D. Each camera contains a front and back layer on which can be 
+attached widgets. When a camera scene is rendered, the 2D back layer is rendered 
+first, followed by the 3D world, and finally the 2D front layer. 
+
+In the following section we review some of these basic widgets.
+
+
+\image html images/fig-widgets.png "Widgets in CHAI3D"
+
+
+
+\section section18-2 Panel
+
+cPanel can be used put an empty panel on a window. Panels have properties for 
+providing round corners, colors, and material texture properties. A panel is 
+defined by its width and height can be placed anywhere in the viewport.
+
+
+@code
+
+    using namespace chai3d;
+	
+	// create a panel
+    cPanel* panel = new cPanel();
+	
+	// add panel to front layer of camera
+    camera->m_frontLayer->addChild(panel);
+	
+	// set width and height of panel
+    panel->setSize(300, 200);
+	
+	// assign radius of each corner of panel
+    panel->setCornerRadius(10, 10, 10, 10);
+	
+	// assign a position (x,y) to panel
+    panel->setLocalPos(40, 60);
+
+	// set a uniform color to panel
+    panel->setColor(cColorf(1.0, 0.5, 0.5));
+	
+	// assign a transparency level to panel
+    panel->setTransparencyLevel(0.5);
+
+@endcode
+
+
+\section section18-3 Bitmap
+
+An application can add a bitmap widget to its user interface to 
+display an image. The image is displayed with its origin at the 
+bottom-left corner of the  widget's destination rectangle, and 
+can be stretched along the X and Y axis.
+
+
+@code
+
+    using namespace chai3d;
+	
+	// create bitmap object
+	cBitmap* bitmap = new cBitmap();
+
+	// add bitmap to front layer of camera
+	camera->m_frontLayer->addChild(bitmap);
+
+	// load image file
+	bitmap->loadFromFile("myImage.png");
+
+@endcode
+	
+	
+	
+\section section18-4 Background
+
+A background widget can be used to display an image that covers the entire display window. 
+
+
+@code
+
+    // create a background object
+    cBackground* background = new cBackground();
+	
+	// add background to back layer of camera
+    camera->m_backLayer->addChild(background);
+
+    // set aspect ration of background image a constant
+    background->setFixedAspectRatio(true);
+
+    // load an image file
+	background->loadFromFile("myImage.png");
+
+@endcode
+
+
+\image html images/fig-widgets-background.png "Example 05-fonts: A background image covers the entire windows."
+
+
+
+\section section18-5 Level
+
+A Level is a linear gauge widget which is used to let users quickly understand where a value lies in a certain range.
+The level can be set horizontally or vertically.
+
+
+@code
+
+    using namespace chai3d;
+	
+	// create dial object
+    level = new cLevel();
+	
+	// add level to front layer of camera	
+    camera->m_frontLayer->addChild(level);
+	
+	// set range of values displayed by level
+    level->setRange(0.0, 0.1);
+    
+	// set size of level
+	level->setSize(40);
+	
+	// enable single line display option
+	level->setSingleIncrementDisplay(true);
+
+    // assign value to level
+    level->setValue(value);
+	
+@endcode
+
+
+The Level can be set horizontally by rotating the widget of 90 degrees.
+
+
+@code
+
+    using namespace chai3d;
+	
+	// rotate level of 90 degrees angle 
+    level->rotateWidgetDeg(90);
+	
+@endcode
+
+
+
+\section section18-6 Dial
+
+A dial offers similar capabilities than a level, but in a circular type display.
+
+\image html images/fig-widgets-dial.png "Dials: (Left) Continuous Display  (Right) Single Increment Display"
+
+@code
+
+    using namespace chai3d;
+	
+	// create dial object
+    dial = new cDial();
+	
+	// add dial to front layer of camera	
+    camera->m_frontLayer->addChild(dial);
+	
+	// set range of values displayed by dial
+    dial->setRange(-0.1, 0.1);
+    
+	// set size of dial
+	dial->setSize(40);
+	
+	// enable single line display option
+	dial->setSingleIncrementDisplay(true);
+
+    // assign value to dial
+    dial->setValue(value);
+	
+@endcode
+
+
+
+\section section18-7 Scope
+
+An application can add a cScope widget to display up to four different signals similar to a digital oscilloscope.
+
+
+@code
+
+    using namespace chai3d;
+	
+    // create a background object
+    scope = new cScope();
+	
+	// add scope to back layer of camera	
+    camera->m_frontLayer->addChild(scope);
+	
+	// assign a position (x,y) to panel
+    scope->setLocalPos(100,60);
+	
+	// set range of signal values (min / max)
+    scope->setRange(-0.1, 0.1);
+	
+	// enable signals for display
+    scope->setSignalEnabled(true, true, true, false);
+	
+	// assign a transparency level to scope
+    scope->setTransparencyLevel(0.7);
+
+@endcode
+
+
+Once the scope has been initialized, the signal values can be continuously updated with the following command:
+
+
+@code
+
+    using namespace chai3d;
+	
+	// assign signal values
+	scope->setSignalValues(value0, value1, value2, value3);
+
+@endcode
+
+
+
+\section section18-8 Label
+
+A Label is a widget that is used add text in an application. For each label, a font is assigned. 
+A font should always be created before instantiating a label and can be shared among many labels.
+
+@code
+
+    using namespace chai3d;
+	
+    // create a font
+    cFont* font = NEW_CFONTCALIBRI20();
+
+    // create a label
+    cLabel* label = new cLabel(font);
+	
+	// add label to front layer of camera
+    camera->m_frontLayer->addChild(label);
+	
+	// assign color to label
+    label->m_fontColor.setBlack();
+	
+	// assign text to label
+    label->setText("my message");
+	
+	// position widget on screen
+    label->setLocalPos(100, 120);
+	
+@endcode
+
+
+
+\section section18-9 Font
+
+CHAI3D supports the use of Bitmap fonts, which consist of a texture atlas containing all of the required 
+letters from the font, and a text data file describing the location and size of each letter on that texture 
+atlas. 
+
+A selection of fonts are encoded in the CHAI3D framework and can be instantiated with the following code.
+The full list of encoded fonts can be found in the <b>src/resources</b> directory.
+
+
+@code
+
+    using namespace chai3d;
+	
+    // create a font (Calibri Size 20)
+    cFont* font1 = NEW_CFONTCALIBRI20();
+
+    // create a font (Calibri Size 36)
+    cFont* font2 = NEW_CFONTCALIBRI36();
+	
+@endcode
+
+
+A font can also be loaded using a font file generated by the application <b>BMFont</b> from AngelCode.
+
+
+@code
+
+    using namespace chai3d;
+	
+    // create a font
+    cFont* font = new cFont();
+
+    // load font from file
+	font->loadFromFile("myFont.fnt");
+	
+@endcode
+
+
+
+\section section18-10 Creating a Bitmap Font using BMFont
+
+
+\subsection subsection18-10-1 Step 1
+
+- Run <b>BMFont</b> and open <b>Options->Font Settings</b>.
+
+\image html images/fig-font-step1.png ""
+
+
+\subsection subsection18-10-2 Step 2
+
+- Select your desired font from the list of installed fonts on your PC, or add a font file that you have on your harddrive.
+- Set the pixel size of the font and check <b>Match char height</b>
+- Check <b>Font Smoothing</b> and <b>Super Sampling</b> if you want the letters to be smooth and anti-aliased.
+
+\image html images/fig-font-step2.png ""
+
+
+\subsection subsection18-10-3 Step 3
+
+- Then back in the main tool window you'll see all the letters contained within your chosen font.
+- Highlight all the letters you wish to be contained in the font, either individually by toggling 
+  on/off each letter, or by toggling subsections of letters from the list on the right.
+
+\image html images/fig-font-step3.png ""
+
+
+\subsection subsection18-10-4 Step 4
+
+- Next, open <b>Options->Export Options</b>
+- Depending on your chosen font, and whether you're adding any after effects to the texture atlas, 
+  you may want to add some letter padding to prevent unintentional artifacts on the letters.
+- Set a Width and Height for the texture atlas. It needs to be big enough to fit all the letters
+onto one Texture. To check that it all fits on the chosen size, go back to the main window 
+and press 'V' or go to <b>Options->Visualize</b>.
+- The best is to stick to power-2 dimensions for the atlas. e.g. 2,4,8,16,32,64,128,256,512 etc.
+- Check 32 <b>Bit depth</b> to allow alpha channel.
+- Check <b>Text</b> File Format, and <b>PNG</b> for the Texture format.
+
+\image html images/fig-font-step4.png ""
+
+
+\subsection subsection18-10-5 Step 5
+
+- Select <b>Options->Save bitmap font as...</b>
+- Save the Bitmap font to your CHAI3D resource folder.
+
+\image html images/fig-font-step5.png ""
+
+*/

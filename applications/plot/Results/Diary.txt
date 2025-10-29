@@ -1,0 +1,19 @@
+BigSampleX-Sweep(NotFull)_17_3_25Afternoon - Done using the big glass with stripes on it. Laser was increased to 35% efficienc, bellow this value not much could be read. Sample not fully analyzed as robot is in the way of the optic if we go all the way. 55 side up
+Same for V2
+
+BigSampleX-Sweep(Full)_17_3_25AfternoonV2 -Same as before but positioned the sample on the holder such that, full measure in the sense of the lenght could be done
+BigSampleZ-Sweep_17_3_25Afternoon - Might actually be a false result  
+BigSampleZ-Sweep_17_3_25AfternoonV2 - Yielded better results than BigSampleZ-Sweep_17_3_25Afternoon, z position increases but measure was done from top to bottom -> Smaller z = more on top
+BigSampleZ-Sweep_17_3_25AfternoonV3 - Same as V2 on a different spot to look for differences/similarities
+
+GlassSample_17_3_25AfternoonWithBackplate - Was done on the same 1mm thick glass sample but with the bottom side being directly touching the backplate. All the other for thin the glass sample were made with the sample hanging (I think).
+GlassSample_18_3_25Morning - Taken with laser at 35%efficience, signal quite different from the ones the day before ,yet procedure the same(?)
+GlassSample_18_3_25MorningV2 - Same
+BigSampleXSWeepFull_18_3_25.csv - Same setting, focus on the surface of the substrate
+BigSampleXSWeepFull_18_3_25V2.csv - Same but in bulk
+BigSampleXSWeepFull_18_3_25V3.csv.csv - same same i think (?)
+MicroscopeSample_1mm_Kalman- Done on 7/4/ measurement of the glass 0.93mm with Kalman filter
+MicroscopeSample_GaussianWithRounding - Same just reading the 0.x decimals of the sensor and gaussian filtering
+GlassSampleUpwards - Simple glass scan in upwards robot direction
+
+FusedSilicaSamples - High intensity laser, triangulare shape to measure width in both directons too see that results is same despite direction

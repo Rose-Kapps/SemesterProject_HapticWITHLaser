@@ -1,0 +1,353 @@
+//===========================================================================
+/*
+    Software License Agreement (BSD License)
+    Copyright (c) 2003-2023, CHAI3D
+    (www.chai3d.org)
+
+    All rights reserved.
+*/
+//===========================================================================
+ 
+/*!
+
+
+\page chapter4-creation Creating an Application
+
+
+
+\section section4-1 Microsoft Visual Studio 
+
+In the following section we demonstrate how to create a project from scratch using
+<b>Microsoft Visual Studio</b>. If you are using a different framework, these instructions
+will give you some basic information on how to get started.
+
+The following screenshots have been taken from <b>Microsoft Visual Studio 2013</b>. 
+If you are using a different version of the SDK then the menu options may change slightly, 
+but the key functionalities should remain the same.
+
+
+
+\subsection subsection4-1-1 Getting Started
+
+In the following steps we setup the basic directory structure and files necessary to build
+an application using CHAI3D. Depending of which display or GUI library you may want to use, project templates 
+are provided for <b>GLFW</b>, <b>FreeGLUT</b>, <b>.NET</b>, and <b>Qt</b> and can be found in the <c><b>CHAI3D/templates</b></c> 
+directory. 
+
+In this example we will show you how to create a project using <b>GLFW</b>. For the other frameworks, 
+the setup is almost identical except for the additional libraries and/or references that may be required. 
+In these cases, we will let you take a closer look at the project templates referenced above.
+
+To get started, we first create an empty directory called <c><b>application</b></c> in which 
+we setup all the necessary files. This directory can be created anywhere on your harddrive.
+
+We then create two sub-directories called <c><b>bin</b></c> and <c><b>external</b></c>.
+The <c><b>bin</b></c> directory will contain the executable file of the application with any 
+resource files associated with it (e.g. media files, DLLs, etc..). 
+The <c><b>external</b></c> directory will contain all external libraries used by your application, including a 
+copy of the CHAI3D framework.
+
+\image html images/fig-vs-0.png 
+
+
+
+In the newly created <c><b>external</b></c> directory, place a copy of CHAI3D. If your application requires other 
+frameworks or libraries, you may place a copy of these files there too.
+
+\image html images/fig-vs-1.png 
+
+
+In the <c><b>bin</b></c> directory, please create two sub-folders named <c><b>win-Win32</b></c> and <c><b>win-x64</b></c> in which 
+you will copy the following DLL files availble from the <c><b>CHAI3D/bin/win-Win32</b></c> and 
+<c><b>CHAI3D/bin/win-x64</b></c> directories. These DLL files are necessary only if you plan to support different tracking 
+or haptic devices. If you are developing an application for the <b>Force Dimension</b> haptic devices, none of these files 
+are needed. If your application contains additional resource files such as images, videos, or sounds, we suggest that you 
+store them in a sub-directory that we called <c><b>resources</b></c> in this example.
+
+\image html images/fig-vs-2.png 
+
+\image html images/fig-vs-44.png 
+
+\image html images/fig-vs-45.png 
+
+
+\subsection subsection4-1-2 Creating Project Files
+
+Launch <b>Microsoft Visual Studio</b> and create a new project file by selecting menu <b>FILE > New > Project</b>.
+
+\image html images/fig-vs-3.png 
+
+
+
+Select <b> Empty Project </b> and click on button <b> Browse... </b>to locate the newly created 
+directory <c><b>application</b></c>.
+
+\image html images/fig-vs-4.png
+
+
+
+Define a name for your project. In this example we name the project: <b>myProject</b>.
+
+\image html images/fig-vs-5.png 
+
+
+
+The project and solution files are now created and can be found in directory <c><b>application/myProject</b></c>
+
+\image html images/fig-vs-6.png
+
+
+Select the configuration manager from menu <b>BUILD > Configuration Manager...</b>.
+
+\image html images/fig-vs-7.png 
+
+
+
+By default, settings are only created for 32-bit compilation (<b>Win32</b>). We now create a new configuration
+for 64-bit platforms (<b>x64</b>). It is important to perform this step before adding additional project files
+to your Solution.
+
+\image html images/fig-vs-8.png 
+
+
+
+Select <b>x64</b> as the new platform and click button <b>OK</b>
+
+\image html images/fig-vs-9.png
+
+
+
+We will now add the CHAI3D project to the application. Select menu <b>FILE > Add > Existing Project</b>.
+
+\image html images/fig-vs-10.png
+
+
+
+Select the project file corresponding to your version of <b>Microsoft Visual Studio</b>.
+ 
+As we are using Visual Studio 2013 in our example, we select project file <c><b>CHAI3D-VS2013.vcxproj</b></c>
+
+\image html images/fig-vs-11.png 
+
+
+
+In this example we also add the <b>GLFW</b> graphic display framework. 
+
+As performed in the previous step, select menu <b>FILE > Add > Existing Project</b>. 
+
+\image html images/fig-vs-12.png
+
+
+
+In the <b>Solution Explorer</b> you should now see all three projects, namely <b>CHAI3D</b>, <b>glfw</b>, and <b>myProject</b>.
+
+\image html images/fig-vs-13.png
+
+
+
+Using the mouse <b>right button</b>, click on <b>myProject</b> and select option <b>Set as StartUp Project</b>.
+ 
+This will tell Visual Studio which application to run once the Solution has been compiled. 
+
+\image html images/fig-vs-14.png 
+
+
+
+We now define the project dependencies of our project. In this example, the application requires both <b>CHAI3D</b> and <b>glfw</b>. 
+Select menu <b>PROJECT > Project Dependencies</b>.
+
+\image html images/fig-vs-15.png
+
+
+
+Using the mouse, check both <b>CHAI3D</b> and <b>glfw</b>.
+
+\image html images/fig-vs-16.png
+
+
+
+Since the project is still empty, we create an empty <b>main.cpp</b> file in which we will write our program.
+
+\image html images/fig-vs-17.png 
+
+
+
+Select <b>C++ File (.cpp)</b> and give it the name <b>main.cpp</b>. Click button <b>Add</b> to generate the new file.
+
+\image html images/fig-vs-18.png 
+
+
+
+The new empty file has now been created and is ready to receive your source code.
+
+\image html images/fig-vs-19.png
+
+
+Since you will probably want to compile and run this application, we suggest that you copy the content of one of the examples provided with CHAI3D.
+For this demonstration we copied the code found in example <c><b>CHAI3D/examples/GLUT/13-primitives</b></c>. If you wish to use another example instead, 
+make sure to also copy any necessary resource files into the <c><b>application/bin</b></c> directory.
+
+\image html images/fig-vs-43.png
+
+
+
+\subsection subsection4-1-3 Setting Project Properties
+
+In this section we setup the different project properties of our application.
+ 
+Using the mouse <b>right button</b>, click on <b>myProject</b> and select option <b>Properties</b>.  
+
+\image html images/fig-vs-20.png
+
+
+The following Property Pages Window will show up.
+
+\image html images/fig-vs-21.png
+
+
+Before modifying any of the properties, we assign the Configuration to <b>All Configurations</b> and the Platform to <b>All Platforms</b>. 
+This will allow us to assign properties to all of the four possible modes simultaneously, respectively:
+- Win32 / Debug
+- Win32 / Release
+- x64 / Debug
+- x64 / release
+
+\image html images/fig-vs-22.png 
+\image html images/fig-vs-23.png
+
+
+
+In <b>Configuration Properties / General</b>, define the <b>Output Directory</b> to <c><b>../../bin/win-\$(platform)\\</b></c>
+
+\image html images/fig-vs-24.png
+
+
+
+In <b>Configuration Properties / C/C++ / General</b>, edit the <b>Additional Include Directories</b>
+
+\image html images/fig-vs-25.png
+
+
+
+Add the following directories:
+- <c><b>../../external/CHAI3D/src</b></c>
+- <c><b>../../external/CHAI3D/externals/Eigen</b></c>
+- <c><b>../../external/CHAI3D/externals/glew/include</b></c>
+- <c><b>../../external/CHAI3D/extras/glfw/include</b></c>
+
+Please note that the last directory is only used if you are using <b>GLFW</b> as the display library. 
+If you are using another framework such as <b>.NET</b> or <b>Qt</b>, then this line can be omitted and replaced
+by other references.
+
+\image html images/fig-vs-26.png
+
+
+
+In <b>Configuration Properties / C/C++ / Language</b>, select <b>Yes (/GR)</b> for option <b>Enable Run-Time Type Information</b>.
+
+\image html images/fig-vs-27.png
+
+
+
+In <b>Configuration Properties / Linker / General</b>, edit <b>Additional Library Directories</b>
+
+\image html images/fig-vs-28.png 
+
+
+
+Add the following directories:
+- <c><b>../../external/CHAI3D/lib/\$(Configuration)/\$(Platform)</b></c>
+- <c><b>../../external/CHAI3D/extras/glfw/lib/\$(Configuration)/\$(Platform)</b></c>
+
+
+\image html images/fig-vs-29.png
+
+
+In <b>Configuration Properties / Linker / Input</b>, edit <b>Additional Dependencies</b>
+
+\image html images/fig-vs-30.png 
+
+
+
+Add the following library files:
+- <c><b>chai3d.lib</b></c>
+- <c><b>glfw.lib</b></c>
+- <c><b>OpenGL32.lib</b></c>
+- <c><b>glu32.lib</b></c>
+
+\image html images/fig-vs-31.png 
+
+
+
+In <b>Configuration Properties / Linker / System</b>, select <b>Console (/SUBSYSTEM:CONSOLE)</b> for option <b>SubSystem</b>.
+
+\image html images/fig-vs-42.png
+
+
+
+As for the final settings we now define two different <b>preprocessor directives</b> for the <b>Win32</b> and <b>x64</b> platforms.
+
+Select the <b>Win32</b> platform.
+
+\image html images/fig-vs-36.png
+
+
+
+In <b>Configuration Properties / C/C++ / Language</b>, edit <b>Processor Definitions</b>.
+
+\image html images/fig-vs-37.png
+
+
+
+Assign the following directive: <c><b>WIN32</b></c>.
+
+\image html images/fig-vs-38.png
+
+
+
+Select the <b>x64</b> platform.
+
+\image html images/fig-vs-39.png
+
+
+
+In <b>Configuration Properties / C/C++ / Language</b>, edit <b>Processor Definitions</b>.
+
+\image html images/fig-vs-40.png
+
+
+
+Assign the following directive: <c><b>WIN64</b></c>.
+
+\image html images/fig-vs-41.png
+
+
+\subsection subsection4-1-4 Compiling and Running
+
+To insure maximum performance and stability of your haptic device, it is <b>very important</b> 
+to always compile and run your application in <b>Release</b> mode whenever you are not debugging your code.
+If you need to debug your code, consider disabling or reducing all haptic forces to avoid having your device 
+go unstable. 
+
+\image html images/fig-vs-32.png 
+
+
+
+To build the entire solution, select menu <b>BUILD > Build Solution</b>
+
+\image html images/fig-vs-33.png
+
+
+
+Once the application has been successfully compiled, you may run the application.
+
+\image html images/fig-vs-34.png
+
+
+
+Here is a final screenshot that illustrates the application running.
+
+\image html images/fig-vs-35.png
+
+
+*/

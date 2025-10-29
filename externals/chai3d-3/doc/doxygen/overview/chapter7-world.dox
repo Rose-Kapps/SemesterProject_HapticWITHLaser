@@ -1,0 +1,76 @@
+//===========================================================================
+/*
+    Software License Agreement (BSD License)
+    Copyright (c) 2003-2023, CHAI3D
+    (www.chai3d.org)
+
+    All rights reserved.
+*/
+//===========================================================================
+ 
+/*!
+
+
+\page chapter7-world World
+
+
+
+
+\section section7-1 Introduction
+
+In CHAI3D nodes or objects (\ref chai3d::cGenericObject "cGenericObject") are the
+fundamental building blocks for all content, with the world object acting as the 
+root node for a tree of node objects. The scene and its descendants determine which
+content is drawn and how it is rendered.
+
+Each node's position is specified in the coordinate system defined by its parent. 
+A node also applies other properties to its content and the content of its 
+descendants. For example, when a node is rotated, all of its descendants are 
+rotated also. You can build complex models  using a tree of nodes and then 
+rotate, translate and scale entire models by adjusting the topmost node's 
+properties.
+
+\image html images/fig-scenegraph.png "A CHAI3D scene graph."
+
+The \ref chai3d::cGenericObject "cGenericObject" class does not draw anything, but 
+it applies its properties to its descendants. Each kind of drawable content is
+represented by a distinct subclass. Some other node subclasses do not draw content 
+of their own, but modify the behavior of their descendants. For example, you can use a 
+\ref chai3d::cVoxelObject "cVoxelObject" object to display volumetric imaging data. 
+
+\image html images/fig-world.png "A virtual CHAI3D world and 3D haptic device."
+
+
+
+\section section7-2 Creating a World
+
+In the following example we create a world and a insert four objects,
+which include a camera, a light source, a sphere, and a cylinder.
+
+
+@code
+
+	using namespace chai3d;
+
+    // create a new world.
+    world = new cWorld();
+
+    // create a camera and insert it into the world
+    camera = new cCamera(world);
+    world->addChild(camera);
+
+    // create a directional light source and insert it into the world
+    light = new cDirectionalLight(world);
+    world->addChild(light);
+
+    // create a sphere and insert it into the world
+    sphere = new cShapeSphere(0.1);
+    world->addChild(sphere);
+
+    // create a cylinder and insert it into the world
+    cylinder = new cShapeCylinder(0.25, 0.25, 0.2);
+    world->addChild(cylinder);
+
+@endcode
+
+*/

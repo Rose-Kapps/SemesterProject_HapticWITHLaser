@@ -1,0 +1,234 @@
+//===========================================================================
+/*
+    Software License Agreement (BSD License)
+    Copyright (c) 2003-2023, CHAI3D
+    (www.chai3d.org)
+
+    All rights reserved.
+*/
+//===========================================================================
+ 
+/*!
+
+
+\page chapter3-organization Organization
+
+
+
+\section section3-1 Introduction
+
+In the following sections we provide a brief description of the organization 
+of the most important files and directories that compose CHAI3D.
+
+
+
+\section section3-2 Main Directories
+
+
+\subsection section3-2-1 ./src
+
+This directory contains the entire source code of the CHAI3D core framework.
+We will come back to that one in the \ref section3-2 "Source Code" section where
+we will explore the organization of the difference source files.
+
+
+\subsection section3-2-2 ./external
+
+This directory contains source code to third-party libraries that are used by 
+CHAI3D. Some of these libraries can be enabled or disabled by selecting the
+desired options in file \ref CGlobals.h
+
+
+\subsection section3-2-3 ./modules
+
+This directory contains all third party extension modules for CHAI3D. 
+The default modules that come with CHAI3D are the <a href="../../modules/ODE/doc/documentation.html">ODE</a>
+wrapper for the open source dynamics engines <a href="http://www.ode.org" target="_blank">ODE</a>, the 
+<a href="../../modules/GEL/doc/documentation.html">GEL</a> framework for modelling deformable bodies and the
+<a href="../../modules/V-REP/doc/documentation.html">V-REP</a> plugin for
+the <a href="http://www.coppeliarobotics.com" target="_blank">Coppelia Robotics V-REP simulator</a>.
+Each module shares a similar structure that include the source files, project files, examples, 
+and documentation.
+
+
+\subsection section3-2-4 ./lib
+
+This directory contains the CHAI3D library files that result from compiling 
+the CHAI3D source code.
+
+
+\subsection section3-2-5 ./examples
+
+This directory contains the project files and source code for the various 
+examples provided with CHAI3D.
+
+
+\subsection section3-2-6 ./bin
+
+This directory contains the executable files that result from compiling 
+CHAI3D with all of its examples. You may also find in that directory dynamic 
+library files (.dll or .dylib) which support third-party haptic devices. A <c><b>resources</b></c>
+directory also includes all the media files that used by the different examples.
+ 
+ 
+\subsection section3-2-7 ./doc
+
+This directory contains all documentation related to CHAI3D. The documentation
+is generated using <a href="http://www.doxygen.org" target="_blank">Doxygen</a>
+and is provided inlined in every source file of the framework.
+
+ 
+\subsection section3-2-8 ./templates
+
+This directory contains three different project templates that use GLUT, Qt,
+and the Microsoft .NET frameworks. These templates are very useful if you want to 
+create a new project from scratch.
+
+
+\subsection section3-2-9 ./extras
+
+This directory contains additional third-party libraries that are used by the examples 
+provided with CHAI3D. They are not required to build the CHAI3D core library, but are
+necessary for the CHAI3D example executables to build and run properly.
+
+
+\subsection section3-2-10 ./utils
+
+This directory contains utilities that convert font and images to source code that
+can be included and built into CHAI3D.
+
+ 
+ 
+\section section3-3 Source Code
+
+The source code is located in the \ref section3-2-1 "/src directory". It contains the main 
+\ref chai3d.h header file and a set of subdirectories with all the source files organized
+by topic.
+
+
+\subsection section3-3-1 ./src/audio
+
+This directory contains all the files that provide sound support to CHAI3D.
+Details are available in the \ref audio "audio" section of the documentation.
+
+
+\subsection section3-3-2 ./src/collisions
+
+This directory contains the files that handle collision detection between rays and
+geometrical primitives such as points, lines, and triangles. 
+Details are available in the \ref collisions "collisions" section of the documentation.
+
+
+\subsection section3-3-3 ./src/devices
+
+This directory contains support for all supported haptic devices.
+Details are available in the \ref devices "devices" section of the documentation.
+
+
+\subsection section3-3-4 ./src/display
+
+This directory contains files related to framebuffers and virtual cameras which are
+used to render scenes of the world in viewports or window displays.
+Details are available in the \ref display "display" section of the documentation.
+
+
+\subsection section3-3-5 ./src/effects
+
+This directory contains all the classes that model haptic effects (e.g friction, 
+vibration, surfaces, etc...) Details are available in the \ref effects "effects" 
+section of the documentation.
+
+
+\subsection section3-3-6 ./src/files
+
+This directory contains support for loading and saving 3D models, 2D images, 
+2D videos, and audio files. Details are available in the \ref files "files" 
+section of the documentation.
+
+
+\subsection section3-3-7 ./src/forces
+
+This directory contains classes that implement force rendering algorithms such 
+as potential fields and finger-proxy based methods. Details are available in the
+\ref forces "forces" section of the documentation.
+
+
+\subsection section3-3-8 ./src/graphics
+
+This directory contains all files related to graphic support. These include 
+support for videos, fog, fonts, images, image arrays, videos, etc... Data structures
+for handling arrays of points, segments, and triangles are also included.
+Details are available in the \ref graphics "graphics" section of the documentation.
+
+
+\subsection section3-3-9 ./src/lighting
+
+This directory contains all classes for modelling light sources and shadows.
+Details are available in the \ref lighting "lighting" section of the documentation.
+
+
+\subsection section3-3-10 ./src/materials
+
+This directory contains all classes for modelling materials and textures. 
+Details are available in the \ref materials "materials" section of the documentation.
+
+
+\subsection section3-3-11 ./src/math
+
+This directory contains the basic code for handling 3D vectors, matrices 
+and quaternions. You will also find a number of functions for performing simple 
+geometrical computations. Details are available in the \ref math "math" section
+of the documentation.
+
+
+\subsection section3-3-12 ./src/resources
+
+This directory contains a collection of files for precompiled fonts and shaders
+that are used for graphic purposes. Details are available in the \ref resources "resources"
+section of the documentation.
+
+
+\subsection section3-3-13 ./src/shaders
+
+This directory contains all classes for supporting vertex and fragment shaders.
+Shaders are used for implementing advanced graphic rendering effects.
+Details are available in the \ref shaders "shaders" section of the documentation.
+
+
+\subsection section3-3-14 ./src/system
+
+This directory contains several useful classes for handling strings, 
+mutexes, and threads. Details are available in the \ref system "system" 
+section of the documentation.
+
+
+\subsection section3-3-15 ./src/timers
+
+This directory contains classes that model a precision clock and frequency 
+counters for accurate time measurement. Details are available in the 
+\ref timers "timers" section of the documentation.
+
+
+\subsection section3-3-16 ./src/tools
+
+This directory contains classes that implement haptic tools which connect
+haptic devices to avatars that interact with objects in the virtual environment. 
+Details are available in the \ref tools "tools" section of the documentation.
+
+
+\subsection section3-3-17 ./src/widgets
+
+This directory contains different classes for rendering 2D widgets such 
+as text labels, dials, bitmap images, scopes, etc...
+Details are available in the \ref widgets "widgets" section of the documentation.
+
+
+\subsection section3-3-18 ./src/world
+
+This directory contains the classes that are used to compose and describe
+a 3D scene. These include the world itself, shape primitives, meshes, volumes, and other 
+3D entities which can be rendered both graphically and haptically.
+Details are available in the \ref world "world" section of the documentation.
+
+
+*/

@@ -1,0 +1,288 @@
+//===========================================================================
+/*
+    Software License Agreement (BSD License)
+    Copyright (c) 2003-2023, CHAI3D
+    (www.chai3d.org)
+
+    All rights reserved.
+*/
+//===========================================================================
+ 
+/*! 
+
+
+\page chapter17-haptics Haptic Rendering
+
+
+
+\section section17-1 Introduction
+
+In the following sections we introduce the basic classes and algorithms that 
+are used to connect a haptic device to a virtual world.
+
+
+ 
+\section section17-2 Tools
+
+A tool is a 3D object that is used to connect, model, and display a haptic device in a virtual world. 
+A tool is modelled graphically by one or more contact spheres called haptic points (\ref chai3d::cHapticPoint "cHapticPoint") that model 
+the interactions between the haptic device and the environment. The simplest tool (\ref chai3d::cToolCursor "cToolCursor") uses a 
+single sphere, whereas a gripper tool (\ref chai3d::cToolGripper "cToolGripper") uses two or more contact points to model a grasping-like 
+interaction (thumb and finger).
+
+A set of force rendering algorithms (\ref chai3d::cAlgorithmFingerProxy "cAlgorithmFingerProxy" and \ref chai3d::cAlgorithmPotentialField "cAlgorithmPotentialField")
+that compute the interaction forces between the haptic point and the environment is associated with each haptic point (\ref chai3d::cHapticPoint "cHapticPoint"). 
+The type of object encountered determines which of the force rendering algorithms is used. 
+ 
+Once all contact forces have been computed at each haptic point of the tool, the resulting forces 
+are combined together and converted into a force, torque, and gripper force that are sent to the haptic device. 
+
+
+\image html images/fig-tool.png "Two tools each composed of two haptic points grasping mesh objects (See demo 06-ODE-exploration)."
+
+
+The following code illustrates how to create a single point contact tool (cursor) and connect it
+to a haptic device.
+
+@code
+
+    using namespace chai3d;
+
+	// create 3D virtual tool
+	cToolCursor* tool;
+	tool = new cToolCursor(world);
+	world->addChild(tool);
+
+	// attach haptic device to virtual tool
+	tool->setHapticDevice(hapticDevice);
+
+@endcode
+
+
+Once a tool has been instantiated, we create a haptic thread that continuously
+reads the position of haptic device, computes the interaction forces between the 
+tool and the environment, and send the computed forces back to the haptic device. 
+If any additional behaviours need to be modelled (e.g. picking or moving an object), these are generally 
+implemented in the same haptics loop. To get a better understanding of these features, we invite you to explore
+the different CHAI3D examples. 
+
+
+@code
+
+    using namespace chai3d;
+	
+	void updateHaptics(void)
+	{
+		// simulation in now running
+		simulationRunning  = true;
+
+		// main haptic simulation loop
+		while(simulationRunning)
+		{
+			// compute global reference frames for each object
+			world->computeGlobalPositions(true);
+
+			// update position and orientation of tool
+			tool->updateFromDevice();
+
+			// compute interaction forces
+			tool->computeInteractionForces();
+
+			// send forces to haptic device
+			tool->applyToDevice();
+		}
+	}
+	
+@endcode
+
+
+When the physical workspace of the haptic device differs from the workspace size of the
+virtual world, a scale factor must be introduced. The scale factor is programmed by 
+assigning a desired workspace size to the tool. 
+
+
+@code
+
+    using namespace chai3d;
+	
+	// map physical workspace of haptic device to a simulation workspace.
+	tool->setWorkspaceRadius(1.5);
+	
+@endcode
+
+
+As haptic devices differ from one and other (e.g. size, range of forces, maximum 
+closed loop stiffness), it is important to consult their physical characteristics before
+assigning haptic properties to the virtual environment to prevent instabilities in the haptic rendering.
+
+The following code sample illustrates how the material stiffness property of an object is programmed 
+according to the specifications of the haptic device. In this example, we take into account the
+maximum closed loop stiffness supported by the haptics device and the workspace scale factor 
+between the tool and the device. 
+
+
+@code
+
+    using namespace chai3d;
+
+	// map physical workspace of haptic device to a simulation workspace.
+	tool->setWorkspaceRadius(1.3);
+
+	// retrieve information from haptic device
+	cHapticDeviceInfo info;
+	info = hapticDevice->getSpecifications();
+
+	// read scale factor between physical workspace of haptic device and simulation workspace
+	double workspaceScaleFactor = tool->getWorkspaceScaleFactor();
+
+	// define maximum scaled stiffness that can be handled by current haptic device.
+	stiffnessMax = info.m_maxForceStiffness / workspaceScaleFactor;
+
+@endcode
+
+
+
+\section section17-3 Haptic Points
+
+As illustrated in the above figure, a haptic tool is composed of a set of haptic points (contact spheres)
+that model the interaction forces between the tool and the environment. When a tool computes the
+interaction forces, the rendering algorithm loops through every haptic point and computes all local contributions
+independently.
+
+
+@code
+
+    using namespace chai3d;
+	
+	// compute interaction forces
+	tool->computeInteractionForces();
+	
+@endcode
+
+
+
+\section section17-4 Force Models
+
+The methodologies that are used to compute the interaction forces at these points are called
+the <b>force rendering algorithms</b>. When the interaction forces are computed for a given tool, 
+each haptic point parses the entire world (or scenegraph) for each algorithm and computes these forces.
+CHAI3D currently implements two force models, namely the <b>potential field</b> and the <b>finger-proxy</b>
+models.
+
+Potential fields are easy to implement and require a small amount of CPU to operate. On the flip side, they 
+do have limitations which have to be handled with care to avoid unwanted artefacts or instabilities 
+(e.g. pop-through effects across thin object, discontinuities at corners, etc...) 
+The finger-proxy addresses many of these problems, but at the cost of a more computationally 
+expensive collision detection algorithms. More information about these algorithms are presented in the 
+following subsections.
+
+In practice, both approaches can be combined together to create rich environments while still maintaining
+the real-time performances needed to guaranty a stable behaviour of the haptic device.
+
+
+
+\subsection subsection17-4-1 Potential-Field Models
+
+
+Additional haptic effects can also be activated and adjusted through the material 
+property class. Haptic effects use potential field algorithms which
+are also supported on any generic shape object. Note that the magnetic effect
+is not currently supported on mesh objects. 
+
+
+@code
+
+    using namespace chai3d;
+	
+    // create a haptic stick-slip effect
+    mesh->createEffectStickSlip();
+
+    // set haptic properties
+    mesh->m_material->setStickSlipForceMax(5.0);
+    mesh->m_material->setStickSlipStiffness(1000);
+	
+@endcode
+
+
+
+
+\subsection subsection17-4-2 Finger-Proxy Models
+
+
+\image html images/fig-mesh-proxy.png "Haptic rendering of mesh objects."
+
+
+To haptically render mesh objects, CHAI3D uses a virtual "finger-proxy" algorithm developed 
+by Ruspini and Khatib, similar to the "god-object" proposed by Zilles and Salisbury. 
+The virtual proxy is a representative object that substitutes for the physical finger 
+or probe in the virtual environment. 
+
+
+\image html images/fig-mesh-ruspini.png "Finger-proxy algorithm by Ruspini and Khatib."
+
+
+The above figure illustrates the motion of the virtual proxy, 
+as the haptic devices's position is altered. The motion of the proxy attempts to always 
+move toward a  goal. When unobstructed, the proxy moves directly towards the goal. When
+the proxy encounters an obstacle, direct motion is not possible, but the proxy may 
+still be able to reduce the distance to the goal by moving along one or more of the 
+constraint surfaces. The motion is chosen to locally minimize the distance to the
+goal. When the proxy is unable to decrease its distance to the goal, it stops at the 
+local minimum configuration. Forces are computed by modelling a virtual spring between 
+the position of the haptic device and the proxy. The stiffness of the spring is 
+defined in the material property.
+
+
+@code
+
+    using namespace chai3d;
+	
+    // create collision detector
+    mesh->createAABBCollisionDetector(toolRadius);
+
+    // set haptic properties
+    mesh->m_material->setStiffness(1000);
+    mesh->m_material->setStaticFriction(0.3);
+    mesh->m_material->setDynamicFriction(0.4);
+	
+@endcode
+
+
+
+\section section17-5 Contact Information
+
+
+\subsection subsection17-5-1 Interaction Events
+
+Every time a haptic point encounters an object with an activated haptic effect, an 
+interaction event is returned. Each interaction event reports a reference to the object,
+the position of the tool at time of interaction, and the computed force.
+
+
+\subsection subsection17-5-2 Collision Events
+
+Every time a contact between the proxy and and object occurs, a collision event is reported.
+A collision event contains useful information about the object, contact position, surface normal, 
+etc... 
+
+The following example shows how to read the contact events from a haptic point. 
+
+
+@code
+
+    using namespace chai3d;
+	
+	// check if a contact event has occurred at contact point
+	if (tool->m_hapticPoint->getNumCollisionEvents() > 0)
+	{
+		// get contact event
+		cCollisionEvent* collisionEvent = tool->m_hapticPoint->getCollisionEvent(0);
+
+		// get object from contact event
+		object = collisionEvent->m_object;
+	}
+	
+@endcode
+
+
+*/

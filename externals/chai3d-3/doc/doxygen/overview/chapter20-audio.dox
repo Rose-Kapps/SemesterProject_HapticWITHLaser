@@ -1,0 +1,92 @@
+//===========================================================================
+/*
+    Software License Agreement (BSD License)
+    Copyright (c) 2003-2023, CHAI3D
+    (www.chai3d.org)
+
+    All rights reserved.
+*/
+//===========================================================================
+ 
+/*! 
+
+
+\page chapter20-audio Audio
+
+
+
+\section section20-1 Introduction
+
+An interactive application would be incomplete without some kind of audio, be it 
+background  music or sound effects. CHAI3D's audio classes incorporate the 
+flexible and powerful OpenAL framework. CHAI3D currently support the WAV audio file format 
+and has sophisticated features for playing sounds in 3D space associated with
+tools and material properties of objects. 
+
+
+
+\section section20-2 Basic Concepts
+
+In real life, sounds are emitted by objects and heard by listeners. The way a 
+sound is perceived depends on a number of factors. A listener can tell roughly 
+which direction a sound is coming from and may also get some sense of its 
+distance from its loudness and quality. A fast-moving sound source (like a 
+aircraft or a passing police car) will change in pitch as it moves as a 
+result of the Doppler Effect. 
+
+
+\image html images/fig-audio-concept.png "Audio Sources and Listener."
+
+
+To simulate the effects of position, CHAI3D requires sounds to originate from 
+Audio Sources (\link chai3d::cAudioSource cAudioSource \endlink) attached to objects. 
+The sounds emitted are then picked up by an Audio Listener 
+(\link chai3d::cAudioDevice cAudioDevice \endlink) attached to another object, most 
+often the main camera. CHAI3D can then simulate the effects of a source's 
+distance and position from the listener object and play them to the user 
+accordingly. The relative speed of the source and listener objects can also be 
+used to simulate the Doppler Effect for added realism.
+
+
+@code
+
+    using namespace chai3d;
+	
+	// create an audio device to play sounds
+	cAudioDevice* audioDevice = new cAudioDevice();
+
+	// attach audio device to camera
+	camera->attachAudioDevice(audioDevice);
+
+	// create an audio buffer
+	cAudioBuffer* audioBuffer = audioDevice->newAudioBuffer();
+
+	// load a WAV file
+	audioBuffer->loadFromFile("sound.wav");
+
+	// create an audio source
+	cAudioSource* audioSource = audioDevice->newAudioSource();
+
+	// assign audio buffer to audio source
+	audioSource->setAudioBuffer(audioBuffer);
+
+	// loop playing of sound
+	audioSource->setLoop(true);
+
+	// set audio gain
+	audioSource->setGain(1.0);
+
+	// set audio pitch
+	audioSource->setPitch(0.2);
+
+	// play sound
+	audioSource->play();
+
+@endcode
+
+
+The manual for OpenAL can be found in the CHAI3D documentation folder and gives
+more information about the many options and parameters available for getting 
+effects just right.
+
+*/

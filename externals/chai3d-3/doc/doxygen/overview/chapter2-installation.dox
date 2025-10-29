@@ -1,0 +1,188 @@
+//===========================================================================
+/*
+    Software License Agreement (BSD License)
+    Copyright (c) 2003-2023, CHAI3D
+    (www.chai3d.org)
+
+    All rights reserved.
+*/
+//===========================================================================
+ 
+/*!
+
+
+\page chapter2-installation Installation
+
+
+
+\section section2-1 Download
+
+The latest version of the software can be downloaded from the CHAI3D website.
+
+- Open a browser to the following webpage: <a href="http://www.chai3d.org/download/releases" target="_blank">www.chai3d.org/download/releases</a>.
+- Decide which operating system you wish to use (Windows, Linux or Mac OS X). 
+- Download the corresponding archive file for your platform.
+- Uncompress the file to your desired working directory.
+
+
+
+\section section2-2 Development Tools
+
+\subsection subsection2-2-1 Windows
+
+The recommended development environment under Windows is Microsoft Visual Studio.
+CHAI3D supports editions 2012, 2013 and 2015.
+
+CHAI3D is compatible with the community edition of Visual Studio 2015, 
+which can be downloaded from <a href="https://www.visualstudio.com/products/visual-studio-community-vs" target="_blank">www.visualstudio.com/products/visual-studio-community-vs</a>.
+
+CHAI3D also supports the Express Edition of Visual Studio, 
+which can be downloaded from <a href="https://www.visualstudio.com/products/visual-studio-express-vs" target="_blank">www.visualstudio.com/products/visual-studio-express-vs</a>. 
+
+
+
+\subsection subsection2-2-2 Linux
+
+Alongside the standard development packages specific to each Linux distribution, some additional
+development packages need to be installed to build CHAI3D. These packages include support for
+USB communication, sound output, and OpenGL GLUT display libraries:
+
+- libusb-1.0 development package 
+- ALSA (Advanced Linux Sound Architecture) development package
+- FreeGLUT development package
+
+Below is the name of these packages for some popular Linux distributions:
+
+- __ubuntu__
+ - libusb-1.0-0-dev
+ - libasound2-dev 
+ - freeglut3-dev 
+
+- __fedora__
+ - libusbx-devel
+ - alsa-lib-devel
+ - freeglut-devel 
+
+- __openSUSE__ 
+ - libusb-1_0-devel
+ - alsa-devel 
+ - freeglut-devel 
+
+__NOTE:__
+In order for your application to connect successfully to your USB haptic device, 
+please make sure to run your CHAI3D applications with super user privileges (sudo).
+
+
+
+\subsection subsection2-2-3 Mac OS X
+
+CHAI3D requires version 10.12 (Sierra) of the operating 
+system to be installed as well as the latest version of XCode. More information 
+can be found on the Apple website: <a href="http://developer.apple.com/tools/xcode" target="_blank">developer.apple.com/tools/xcode</a>
+
+
+
+\section section2-3 Graphic Drivers
+
+CHAI3D uses the OpenGL framework to perform 3D graphic rendering. Under the Linux 
+and Mac OS X operating systems, OpenGL drivers are provided by default. If you are
+using Windows and have installed the operating system directly from a Microsoft Windows 
+Installation CD or DVD, you will need to update your graphic drivers by downloading 
+a fresh copy from the website of your graphics card manufacturer.
+
+If you card is an ATI or an NVIDIA model, you may find a link to their website here:
+
+- NVIDIA: <a href="http://www.nvidia.com" target="_blank">www.nvidia.com</a> 
+- ATI: <a href="http://www.amd.com" target="_blank">www.amd.com</a>
+
+Note that Microsoft only provides an emulated version of OpenGL using DirectX. 
+Therefore if you are encountering any performance issues with the graphic rendering,
+OpenGL drivers are among the first things to check. 
+
+
+
+\section section2-4 Installing Haptic Devices
+
+CHAI3D currently supports the following commercial haptic devices:
+
+
+\subsection subsection2-4-1 Force Dimension
+
+The Force Dimension family of force-feedback interfaces include the omega.x, delta.x and 
+sigma.x haptic devices. \n 
+
+On Linux and Mac OS X platforms, the libraries required to support Force Dimension devices
+are included with CHAI3D so there is nothing else to do.
+
+On Windows, please download the latest drivers from the Force Dimension support website: 
+<a href="http://www.forcedimension.com/support/download" target="_blank">www.forcedimension.com/support/download</a>
+
+
+\subsection subsection2-4-2 Novint Technologies
+
+Support for the Falcon haptic device is provided by the Force Dimension drivers.
+
+On Windows, please download the latest drivers from the Force Dimension support website: 
+<a href="http://www.forcedimension.com/support/download" target="_blank">www.forcedimension.com/support/download</a>
+
+If you were previously using the Novint drivers, please carefully follow these instructions:
+- Uninstall all software provided by Novint. Carefully follow all instructions that may be displayed on the screen during uninstallation.
+- Download and install the Force Dimension drivers for your Windows architecture (32- or 64-bit) from the Force Dimension website.
+- Restart your computer.
+- Connect your Falcon haptic device.
+
+If the Falcon device is not detected, you will probably have to manually force the Force Dimension driver to be installed on the Falcon device.
+Please follow these instructions:
+
+- Control Panel -> System -> Device Manager
+- Select "Falcon" device
+- Select thumbnail "Driver"
+- Select "update driver"
+- Select "Browse my computer for drivers"
+- Select "Let me pick from a list of device drivers on my computer"
+- Choose the latest driver (Force Dimension), and you should be ready to go!
+
+
+\subsection subsection2-4-3 3D-Systems
+
+The supported haptic devices include the Phantom Omni, Phantom Desktop, and Phantom Premium (6-DOF).
+
+Please contact 3D Systems to obtain a copy of their latest Windows drivers and a copy of OpenHaptics 3.0 or higher.
+
+If you wish to use two Phantom devices simultaneously (Windows only), please make sure that you name 
+the second device as "Phantom2". This operation is performed in the main Phantom Configuration Panel
+program.
+
+\image html images/fig-phantom-config.jpg "Configuring a second Phantom Device"
+
+
+\subsection subsection2-4-4 Leap Motion
+
+The only supported device is the Leap Motion Controller.
+
+Please please download the latest drivers from the Leap Motion website: 
+<a href="https://developer.leapmotion.com/" target="_blank">developer.leapmotion.com</a>
+
+
+\subsection subsection2-4-5 Sixense
+
+The only supported device is the Razer Hydra.
+
+Please please download the latest drivers from the Sixense website: 
+<a href="http://sixense.com/sixensecoreapi/" target="_blank">sixense.com/sixensecoreapi</a>
+
+In order to enable Sixense device support in CHAI3D, you will need to uncomment the following flag in
+the global relevant operating system section of the configuration header file \ref CGlobals.h "CGlobals.h":
+
+@code
+
+    //--------------------------------------------------------------------
+    // HAPTIC DEVICES
+    //--------------------------------------------------------------------
+    
+    #define C_ENABLE_SIXENSE_DEVICE_SUPPORT
+
+@endcode
+
+
+*/

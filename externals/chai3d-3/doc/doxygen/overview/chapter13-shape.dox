@@ -1,0 +1,166 @@
+//===========================================================================
+/*
+    Software License Agreement (BSD License)
+    Copyright (c) 2003-2023, CHAI3D
+    (www.chai3d.org)
+
+    All rights reserved.
+*/
+//===========================================================================
+ 
+/*! 
+
+
+\page chapter13-shape Shape Primitives
+
+
+
+\section section13-1 Introduction
+
+While mesh objects are incredibly versatile, the amount of computation required 
+for performing collision detection between the tool and the object can become 
+substantial when the number of polygons becomes large. To address this problem 
+CHAI3D offers a selection of primitives that can be used to model simple shapes 
+such as spheres, cylinders, boxes, etc... Instead of computing collisions with 
+large sets of triangles, implicit models are used to quickly compute if a tool 
+is located inside or outside of the shape. By combining these models with haptic 
+effects we can substantially reduce the amount of computation necessary to compute 
+interactive force between the haptic device and the environment. 
+
+\image html images/fig-shapes.png "Shape primitives."
+
+
+\section section13-2 Box Object
+
+The following example illustrates how to create a box object and assign a surface 
+haptic effect.
+
+@code
+
+    using namespace chai3d;
+	
+    // create a box and define its dimensions
+    object = new cShapeBox(0.1, 0.2, 0.3)
+
+    // add object to world
+    world->addChild(object);
+
+    // set haptic properties
+    object->m_material->setStiffness(500);
+
+    // create a haptic surface effect
+    object->createEffectSurface();
+	
+@endcode
+
+
+
+
+\section section13-3 Sphere Object
+
+The following example illustrates how to create a sphere object and assign a surface 
+haptic effect.
+
+@code
+
+    using namespace chai3d;
+	
+    // create a sphere and define its radius
+    object = new cShapeSphere(0.3);
+
+    // add object to world
+    world->addChild(object);
+
+    // set haptic properties
+    object->m_material->setStiffness(500);
+
+    // create a haptic surface effect
+    object->createEffectSurface();
+	
+@endcode
+
+
+
+
+\section section13-4 Cylinder Object
+
+The following example illustrates how to create a cylinder object and assign a surface 
+haptic effect.
+
+@code
+
+    using namespace chai3d;
+	
+    // create a cylinder by defining its bottom and top radius, and its height
+    object = new cShapeCylinder(0.1, 0.1, 0.3)
+
+    // add object to world
+    world->addChild(object);
+
+    // set haptic properties
+    object->m_material->setStiffness(500);
+
+    // create a haptic surface effect
+    object->createEffectSurface();
+	
+
+@endcode
+
+
+
+
+\section section13-5 Torus Object
+
+The following example illustrates how to create a torus object and assign a 
+surface haptic effect.
+
+
+@code
+
+    using namespace chai3d;
+	
+    // create a torus
+    object = new cShapeTorus(0.25, 0.50);
+
+    // add object to world
+    world->addChild(object);
+
+    // set haptic properties
+    object->m_material->setStiffness(500);
+
+    // create a haptic surface effect
+    object->createEffectSurface();
+	
+@endcode
+
+
+
+
+\section section13-6 Line Object
+
+The following example illustrates how to create a line object and assign a magnetic 
+haptic effect.
+
+
+@code
+
+    using namespace chai3d;
+	
+    // create a line
+    line = new cShapeLine(cVector3d(0.0, 0.0, 0.0), cVector3d(1.0, 1.0, 1.0));
+    world->addChild(line);
+
+    // set color at each point
+    line->m_colorPointA.setWhite();
+    line->m_colorPointB.setWhite();
+
+    // create haptic effect and set haptic properties
+    line->createEffectMagnetic();
+    line->m_material->setMagnetMaxDistance(0.05);
+    line->m_material->setMagnetMaxForce(5.0);
+    line->m_material->setStiffness(500);
+	
+@endcode
+
+
+*/

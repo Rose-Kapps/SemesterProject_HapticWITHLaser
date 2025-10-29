@@ -1,0 +1,197 @@
+//===========================================================================
+/*
+    Software License Agreement (BSD License)
+    Copyright (c) 2003-2023, CHAI3D
+    (www.chai3d.org)
+
+    All rights reserved.
+*/
+//===========================================================================
+ 
+/*! 
+
+
+\page chapter12-volume Volume Objects
+
+
+
+\section section12-1 Introduction
+
+Volume rendering is essential to scientific and engineering applications that 
+require visualization of three-dimensional data sets. Examples include 
+visualization of data acquired by medical imaging devices or resulting 
+from computational fluid dynamics simulations. Users of interactive volume 
+rendering applications rely on the performance of modern graphics accelerators 
+for efficient data exploration and feature discovery.
+
+\image html images/fig-voxels-model.png "3D volume object composed from a stack of 2D images. See example 30-voxel-colormap."
+
+
+
+\section section12-2 Voxel Data
+
+A voxel represents a value on a regular grid in three-dimensional space. 
+Voxel is a portmanteau for "volume" and "pixel" where pixel is a combination 
+of "picture" and "element". As with pixels in a bitmap, voxels themselves do 
+not typically have their position (their coordinates) explicitly encoded along 
+with their values. Instead, the position of a voxel is inferred based upon its 
+position relative to other voxels (i.e., its position in the data structure 
+that makes up a single volumetric image). In contrast to pixels and voxels, 
+points and polygons are often explicitly represented by the coordinates of 
+their vertices. A direct consequence of this difference is that polygons are 
+able to efficiently represent simple 3D structures with lots of empty or 
+homogeneously filled space, while voxels are good at representing regularly 
+sampled spaces that are non-homogeneously filled.
+
+Voxels are frequently used in the visualization and analysis of medical and 
+scientific data. Some volumetric displays use voxels to describe their 
+resolution. For example, a display might be able to show 512x512x512 voxels.
+
+
+
+\section section12-3 Voxel Objects
+
+Volume objects are implemented in CHAI3D with a class called cVoxelObject,
+where the volume data is stored into memory as a 3D texture (cTexture3D).
+In the following code we illustrate how to setup such object and program 
+the individual voxels.
+
+
+@code
+
+    using namespace chai3d;
+	
+    //--------------------------------------------------------------------------
+    // CREATE VOLUME MODEL
+    //--------------------------------------------------------------------------
+
+    // create a volumetric model
+    cVoxelObject* object = new cVoxelObject();
+
+    // add object to world
+    world->addChild(object);
+        
+    // set the dimensions by assigning the position of the min and max corners
+    object->m_minCorner.set(-0.5,-0.5,-0.5);
+    object->m_maxCorner.set( 0.5, 0.5, 0.5);
+
+    // set the texture coordinate at each corner.
+    object->m_minTextureCoord.set(0.0, 0.0, 0.0);
+    object->m_maxTextureCoord.set(1.0, 1.0, 1.0);
+
+    // set general material color
+    object->m_material->setOrangeCoral();
+
+    // set stiffness property
+    object->setStiffness(0.2 * maxStiffness);
+
+    // show/hide boundary box
+    object->setShowBoundaryBox(false);
+
+
+    //--------------------------------------------------------------------------
+    // CREATE VOXEL DATA
+    //--------------------------------------------------------------------------
+
+    // create multi image data structure
+    cMultiImagePtr image = cMultiImage::create();
+
+    // allocate 3D image data
+    image->allocate(512, 512, 512, GL_RGBA);
+
+    // create texture
+    texture = cTexture3d::create();
+	
+    // assign volumetric image to texture
+    texture->setImage(image);
+
+    // assign texture to voxel object
+    object->setTexture(texture);
+
+    // set default rendering mode
+    object->setRenderingModeIsosurfaceMaterial();
+
+    // set quality of graphic rendering
+    object->setQuality(0.5);
+	
+    // draw some 3D volumetric object
+    buildVoxelShape(0.5, 0.2);
+
+@endcode
+
+
+\image html images/fig-voxels-sphere.png "Editing voxels. See example 28-voxel-basic."
+
+To edit the content of the voxel data, you can use the following method:
+
+
+@code
+
+    using namespace chai3d;
+	
+	// assign a value to a voxel
+	image->setVoxelColor(x, y, z, color);
+
+@endcode
+
+
+After the data has been modified (one or more voxel), make sure to always flag the texture 
+for update from CPU to GPU memory.
+
+
+@code
+
+    using namespace chai3d;
+	
+	// update voxel data from CPU to GPU memory
+	texture->markForUpdate();
+
+@endcode
+
+
+
+\section section12-4 File Support
+
+Volume models can also be constructed by loading into memory a stack of 2D images. 
+
+
+@code
+
+    using namespace chai3d;
+	
+    // create multi image
+    cMultiImagePtr image = cMultiImage::create();
+
+	// load voxel data from images
+    int numImages = image->loadFromFiles("myModel0"), "png", 256);
+
+@endcode
+
+
+\image html images/fig-colormap.png "Transfer functions."
+
+If your volume images are in gray scale level (CT, MRI data), you can use a transfer
+function to colorize the data. The role of the transfer function is to emphasize 
+features in the data by mapping values and other data measures to optical 
+properties. The simplest and most widely used transfer functions are one 
+dimensional, and they map the range of data values to color and opacity. 
+Typically, these transfer functions are implemented with 1D texture lookup 
+tables. 
+
+
+@code
+
+    using namespace chai3d;
+	
+	// create colormap image
+    cImagePtr colorMap = cImage::create();
+    
+	// load colormap file
+	colorMap->loadFromFile("myColorMap.png");
+
+    // assign colormap to object
+    object->m_colorMap->setImage(colorMap);
+
+@endcode
+
+*/

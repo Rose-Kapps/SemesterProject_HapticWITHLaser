@@ -1,0 +1,152 @@
+//===========================================================================
+/*
+    Software License Agreement (BSD License)
+    Copyright (c) 2003-2023, CHAI3D
+    (www.chai3d.org)
+
+    All rights reserved.
+*/
+//===========================================================================
+ 
+/*!
+
+
+\page chapter6-haptic-devices Haptic Devices
+
+
+
+\section section6-1 Introduction
+
+A haptic device is a bidirectional instrumented/actuated human-machine interface, 
+employed by the human operator to actively interact with a computer simulated 
+virtual environment. A haptic device can be in the form of a mouse, steering 
+wheel, fingerpad, robotic handle, gripper, joystick, gloves, magnetically levitated 
+wrist, or even motion platforms that move the entire user's body. It can be used to 
+simulate an environment with mass, damping, friction, and stiffness properties, or 
+it can mimic the mechanical behavior of a virtual tool interacting with its 
+surrounding virtual environment. 
+
+CHAI3D provides a base class called \ref chai3d::cGenericHapticDevice "cGenericHapticDevice"
+that implements a set of methods to communicate with most common 3D haptic devices. The 
+position of the end-effector or handle of a haptic device can be read by using methods such as 
+\ref chai3d::cGenericHapticDevice::getPosition() "getPosition()", 
+\ref chai3d::cGenericHapticDevice::getRotation() "getRotation()", 
+\ref chai3d::cGenericHapticDevice::getGripperAngleDeg() "getGripperAngleDeg()".
+Optional user switches or buttons can be read by calling 
+\ref chai3d::cGenericHapticDevice::getUserSwitch() "getUserSwitch()".
+
+Forces and torques can be sent to the haptic device by calling methods such as 
+\ref chai3d::cGenericHapticDevice::setForce() "setForce()", 
+\ref chai3d::cGenericHapticDevice::setForceAndTorque() "setForceAndTorque()",and 
+\ref chai3d::cGenericHapticDevice::setForceAndTorqueAndGripperForce() "setForceAndTorqueAndGripperForce()". 
+
+For each model of haptic device (e.g delta.x, omega.x falcon, phantom, etc.) CHAI3D 
+implements a specific class (e.g \ref chai3d::cDeltaDevice "cDeltaDevice", \ref chai3d::cPhantomDevice "cPhantomDevice") 
+which inherits from \ref chai3d::cGenericHapticDevice "cGenericHapticDevice" and implements each command by calling
+specific commands from the API that supports the device. 
+
+
+
+\section section6-2 General Conventions
+
+All quantities are expressed in IUS (metric) unit. The reference device coordinate 
+system specifies that the x-axis is pointing towards the operator, the y-axis towards
+his or her right hand side, and the z-axis upward. Finally, the origin is always located 
+at the center of the physical workspace of the device. 
+
+If the haptic device carries a wrist or stylus, the orientation of its handle is 
+expressed by using a rotation matrix. The convention is illustrated in the following 
+illustrations for a three, six, and seven degrees-of-freedom device.
+
+\image html images/fig-device-coordinates.png "Reference frame for a three, six, and seven degrees-of-freedom haptic device."
+
+Example <c><b>02-multi-devices</b></c> is a simple application that displays a reference frame 
+for each haptic device connected to the computer. Reference frames use 
+colors instead of labels to name the different axis (respectively x, y and z). 
+The color convention is: __red__ for the x-axis, __green__ for the y-axis, and __blue__ for the 
+z-axis.
+
+\image html images/fig-multi-device.png "CHAI3D example 02-multi-devices: Reference frame and cursor."
+
+
+
+\section section6-3 Haptic Device Handler
+
+The haptic device handler (\ref chai3d::cHapticDeviceHandler "cHapticDeviceHandler") is a class
+that searches for and lists all haptic devices connected to the computer. 
+
+In the following listing we illustrate a simple example that applies a force to a 
+haptic device to bring its end-effector toward the center point of its workspace:
+
+
+@code
+
+    using namespace chai3d;
+
+	// create haptic device handler
+	cHapticDeviceHandler* handler;
+	handler = new cHapticDeviceHandler();
+
+	// get handle to first available haptic device on the list
+	cGenericHapticDevice* hapticDevice;
+	handler->getDevice(hapticDevice, 0);
+
+	// open connection to haptic device
+	hapticDevice->open();
+
+	// initialize simulation
+	bool simulationRunning = true;
+	double Kp = 25; 				
+	cVector3d position(0,0,0);				
+
+	// haptics loop
+	while (simulationRunning)
+	{
+			// read position from haptic device
+			hapticDevice->getPosition(position);
+			
+			// compute force
+			cVector3d force = -Kp * position;
+
+			// send force to haptic device
+			hapticDevice->setForce(force);
+	}
+
+	// close connection to haptic device
+	hapticDevice->close();
+
+@endcode
+
+	
+	
+\section section6-4 Custom Haptic Devices
+	
+\ref chai3d::cMyCustomDevice "cMyCustomDevice" provides a basic template which allows you 
+to very easily interface CHAI3D to your own custom haptic device. Simply follow the 12 commented
+step in file \ref CMyCustomDevice.cpp and complete the code accordingly. Depending of the numbers of 
+degrees of freedom on your device, not all methods may need to be implemented. 
+For instance, if your device does not provide any rotational degrees of freedom, 
+simply ignore the \ref chai3d::cGenericHapticDevice::getRotation() "getRotation()" method.
+Default values will be returned correctly if these are not implemented on your device.
+In the case of rotations for instance, the identity matrix is returned.
+
+You may also rename this class in which case you will also want to customize the haptics handler 
+to automatically detect your device. Please consult method \ref chai3d::cHapticDeviceHandler::update() "update()" 
+of the \ref chai3d::cHapticDeviceHandler "cHapticDeviceHandler" class which is located in file 
+\ref CHapticDeviceHandler.cpp. Simply see how the haptic device handler already looks for device of type 
+\ref chai3d::cMyCustomDevice "cMyCustomDevice".
+
+If you are encountering any problems with your implementation, check for instance file 
+\ref CDeltaDevices.cpp which implement supports for the Force Dimension and Novint haptic devices. 
+In order to verify the implementation use the <c><b>01-mydevice</b></c> example to get started. 
+Example <c><b>11-effects</b></c> is a great demo to verify how basic haptic effects may behave with 
+you haptic devices. If you do encounter vibrations or instabilities, try reducing the 
+maximum stiffness supported by your device  (see STEP1 in file \ref CMyCustomDevice.cpp).
+
+Make sure that your device is also communicating fast enough with your computer. 
+Ideally the communication period should take less than 1ms in order to reach a desired 
+update rate of at least 1000Hz. Problems can typically occur when using a slow serial 
+port (RS232) for instance.
+
+	
+*/
