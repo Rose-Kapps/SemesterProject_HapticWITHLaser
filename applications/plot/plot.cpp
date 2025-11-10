@@ -1918,7 +1918,7 @@ void updateHapticDevice(void)
                 }
 
                 if (scaleFactor == 0.02) {
-                    zPosDesired = hapticPos.z();
+                    zPosDesired = hapticPos.z();  /// TEST TO REMOVE THAT
                 }
 
                 if (THGsignal > lastTHGsignal) {  // Increase in the signal means that we are closer to the interface -> we update the z position desired
