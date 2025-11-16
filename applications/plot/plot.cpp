@@ -1693,6 +1693,13 @@ void updateHapticDevice(void)
     // variable to store haptic device position when user button is pressed
     cVector3d hapticPos0;
 
+    // variable to store robot device position when user button is pressed
+    cVector3d robotPos0(0, 0, 0);
+
+	// variable to store virtual robot position in the haptic frame
+    cVector3d virtualRobotPos(0, 0, 0);
+
+
     // activate haptic forces
     hapticDevice->enableForces(true);
 
@@ -1796,6 +1803,9 @@ void updateHapticDevice(void)
         bool userButton = userButton0 | userButton1;
 
 
+
+		// A NE PAS UTILISER POUR LE CONTROLE --> DELAIS ET INSTABILITE !!!
+
         // get current position of robot device
         cVector3d robotPos(0, 0, 0);
         robotDevice->getPosition(robotPos);
@@ -1889,6 +1899,9 @@ void updateHapticDevice(void)
                 zPosDesired = hapticPos.z();
 
                 idlePeriod = 1;
+
+                // get current position of robot device
+                robotDevice->getPosition(robotPos0);
 
                 //auto now_time = chrono::steady_clock::now();
                 //long long timestamp_ms = chrono::duration_cast<chrono::milliseconds>(now_time.time_since_epoch()).count();
@@ -2091,27 +2104,64 @@ void updateHapticDevice(void)
 
                     planar_exploration = 1; 
 
-                    Vec3 velocity(robotVel.x(), robotVel.y(), robotVel.z());
-                    double vel_normal = velocity.dot(normal);
+					// ----- Transformation de tout ce dont on a besoin dans le repère du haptic device ---- //
 
-                    Vec3 robotPosCur_Vec3(robotPos.x(), robotPos.y(), robotPos.z());
+					cVector3d normal_HapticFrame = robotRot * cVector3d(normal[0], normal[1], normal[2]);
+					cVector3d centroid_HapticFrame = robotRot * cVector3d(centroid[0], centroid[1], centroid[2]);
 
-                    // compute spring force to make the manipulating robot follow the plane 
+					// ------------------- CONVERSION EN VEC3 POUR UTILISER LES FONCTIONS DE EIGEN ---------------- //
 
+					Vec3 normal_HapticFrame_Vec3(normal_HapticFrame.x(), normal_HapticFrame.y(), normal_HapticFrame.z());
+					Vec3 centroid_HapticFrame_Vec3(centroid_HapticFrame.x(), centroid_HapticFrame.y(), centroid_HapticFrame.z());
+
+					/*Vec3 robotPos0_Vec3(robotPos0.x(), robotPos0.y(), robotPos0.z());*/
+
+					// ------------------- Compute virtual position of the manipulating robot in the haptic frame ---------------- //
+
+					cVector3d virtualRobotPos = robotRot * robotPos0 + scaleFactor * (hapticPos - hapticPos0);
+                    
+                    // ------------------- CONVERSION EN VEC3 POUR UTILISER LES FONCTIONS DE EIGEN ---------------- //
+
+					Vec3 virtualRobotPos_Vec3(virtualRobotPos.x(), virtualRobotPos.y(), virtualRobotPos.z());
+
+					// ------------------- Compute force feedback to follow the plane ---------------- //
                     double K_normal = 300000;
                     double damping_normal = 0;
-                    double d = signedDistanceToPlane(robotPosCur_Vec3, centroid, normal);
-                    //cout << "d: " << d << endl;
 
-                    Vec3 F_normal_without_damping = -K_normal * d * normal;
+                    double d = signedDistanceToPlane(virtualRobotPos_Vec3, centroid_HapticFrame_Vec3, normal_HapticFrame_Vec3);
+					Vec3 hapticVel_Vec3(hapticVel.x(), hapticVel.y(), hapticVel.z());
+					double vel_normal = hapticVel_Vec3.dot(normal_HapticFrame_Vec3);
+
+                    Vec3 F_normal_without_damping = -K_normal * d * normal_HapticFrame_Vec3;
                     //cout << "FnormalW/damping: " << F_normal_without_damping << endl;
-                    Vec3 F_normal_with_damping = F_normal_without_damping -damping_normal * vel_normal * normal;
+                    Vec3 F_normal_with_damping = F_normal_without_damping - damping_normal * vel_normal * normal_HapticFrame_Vec3;
                     //cout << "FnormalWdamping: " << F_normal_with_damping << endl;
 
-
                     cVector3d F_normal_converted(F_normal_with_damping[0], F_normal_with_damping[1], F_normal_with_damping[2]);
-                    cVector3d F_normal_HapticFrame = robotRot * F_normal_converted;
-                    force += F_normal_HapticFrame;
+					force += F_normal_converted;
+
+     //               Vec3 velocity(robotVel.x(), robotVel.y(), robotVel.z());
+     //               double vel_normal = velocity.dot(normal);
+
+     //               Vec3 robotPosCur_Vec3(robotPos.x(), robotPos.y(), robotPos.z());
+
+     //               // compute spring force to make the manipulating robot follow the plane 
+
+					//// Tester différentes valeurs de stiffness et de damping (garder en tête ratio 700,70 qui marchait bien avec hapticPos et hapticVel)
+     //               double K_normal = 300000;
+     //               double damping_normal = 0;
+     //               double d = signedDistanceToPlane(robotPosCur_Vec3, centroid, normal);
+     //               //cout << "d: " << d << endl;
+
+     //               Vec3 F_normal_without_damping = -K_normal * d * normal;
+     //               //cout << "FnormalW/damping: " << F_normal_without_damping << endl;
+     //               Vec3 F_normal_with_damping = F_normal_without_damping -damping_normal * vel_normal * normal;
+     //               //cout << "FnormalWdamping: " << F_normal_with_damping << endl;
+
+
+     //               cVector3d F_normal_converted(F_normal_with_damping[0], F_normal_with_damping[1], F_normal_with_damping[2]);
+     //               cVector3d F_normal_HapticFrame = robotRot * F_normal_converted;
+     //               force += F_normal_HapticFrame;
 
                     auto now_time_plane = chrono::steady_clock::now();
                     long long timestamp_ms_plane = chrono::duration_cast<chrono::milliseconds>(now_time_plane.time_since_epoch()).count();
