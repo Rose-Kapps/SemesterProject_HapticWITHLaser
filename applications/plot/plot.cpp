@@ -161,7 +161,7 @@ cState haptic_state = FIND_INTERFACE;
 
 vector<Vec3> list_of_interface_points;
 
-double threshold = 2;  // 2V now before it was 90mV
+double threshold = 1.6;  // 2V now before it was 90mV
 
 //------------------------------------------------------------------------------
 // CHAI3D GRAPHIC VARIABLES AND OBJECTS
@@ -1835,10 +1835,10 @@ void updateHapticDevice(void)
         double max_voltage = 0.0;
 
         if (scaleFactor == 0.02) {
-            max_voltage = 2;
+            max_voltage = 0.3;
         }
         else if (scaleFactor == 0.001) {
-            max_voltage = 4.2;
+            max_voltage = 1.8;
         }
         // normalized value multiplied by three for amplification 
         /*double THGsignal = cClamp((voltageSmoothed - min_voltage) / (max_voltage - min_voltage), 0.0, 1.0);*/
@@ -1850,6 +1850,20 @@ void updateHapticDevice(void)
         {
             THGsignal = 0.0;
         }
+
+        ////------- Dynamic adjustment of the scale factor -------//  TO TEST !!!  --> ca marche pas ca switch direct !!
+
+        //if (scaleFactor == 0.02 and THGsignal >= 0.5) {
+        //    cout << "smaller scale factor for fine exploration" << endl;
+        //    scaleFactor = 0.001;
+        //}
+
+        //else if (scaleFactor == 0.001 and THGsignal == 0) {
+        //    cout << "bigger scale factor to find the interface" << endl;
+        //    scaleFactor = 0.02;
+        //}
+
+        //// ------ END OF Dynamic adjustment of the scale factor -------//
 
         //--------------------------------------------------------------------------
         // STATE MACHINE
@@ -2022,40 +2036,40 @@ void updateHapticDevice(void)
 
                     // ------- AJOUT STIFFNESS JUSTE POUR AIDER DANS LE PREMIER STATE (mais dans l'idée, il faut trouver une autre méthode)
                     
-                    double kz_stiff = 700;  // stiffness proportionnal to the THG level
+                    //double kz_stiff = 700;  // stiffness proportionnal to the THG level
 
-                    /*if (scaleFactor == 0.02) {
-                        kz_stiff = 50;
-                    }*/
+                    ///*if (scaleFactor == 0.02) {
+                    //    kz_stiff = 50;
+                    //}*/
 
-                    if (THGsignal < 0.2) {    // if the THG signal is low we don't want stiffness feedback
-                        zPosDesired = hapticPos.z();
-                    }
+                    //if (THGsignal < 0.2) {    // if the THG signal is low we don't want stiffness feedback
+                    //    zPosDesired = hapticPos.z();
+                    //}
 
-                    if (scaleFactor == 0.02) {
-                        zPosDesired = hapticPos.z();  /// TEST TO REMOVE THAT
-                    }
+                    //if (scaleFactor == 0.02) {
+                    //    zPosDesired = hapticPos.z();  /// TEST TO REMOVE THAT
+                    //}
 
-                    if (THGsignal > lastTHGsignal) {  // Increase in the signal means that we are closer to the interface -> we update the z position desired
+                    //if (THGsignal > lastTHGsignal) {  // Increase in the signal means that we are closer to the interface -> we update the z position desired
 
-                        zPosDesired = hapticPos.z();   // A DECLARER EN VARIABLE GLOBALE !!!
-                        /*cout << "THG signal: " << THGsignal << endl;
-                        cout << "Last THG signal: " << lastTHGsignal << endl;
-                        cout << "Voltage level: " << voltageLevel << endl;
-                        cout << "z PosDesired: " << zPosDesired << endl;*/
-                        lastTHGsignal = THGsignal;
-                        /*cout << "test";*/
+                    //    zPosDesired = hapticPos.z();   // A DECLARER EN VARIABLE GLOBALE !!!
+                    //    /*cout << "THG signal: " << THGsignal << endl;
+                    //    cout << "Last THG signal: " << lastTHGsignal << endl;
+                    //    cout << "Voltage level: " << voltageLevel << endl;
+                    //    cout << "z PosDesired: " << zPosDesired << endl;*/
+                    //    lastTHGsignal = THGsignal;
+                    //    /*cout << "test";*/
 
-                    }
+                    //}
 
-                    cVector3d Fz_stiff(0.0, 0.0, -kz_stiff * (hapticPos.z() - zPosDesired));
+                    //cVector3d Fz_stiff(0.0, 0.0, -kz_stiff * (hapticPos.z() - zPosDesired));
 
-                    force += Fz_stiff;
+                    /*force += Fz_stiff;*/
 
                     // -----------------------------------------------------------------------------------------------------------------------
 
                     // Store the points that corresponds to an interface point --> Take the position of the manipulating robot
-                    if (voltageLevel > 4.1) { //max value to adapt
+                    if (voltageLevel > 1.7) { //max value to adapt
 
                         Vec3 interface_point = { robotPos.x(),robotPos.y(),robotPos.z() };
                         
@@ -2125,8 +2139,8 @@ void updateHapticDevice(void)
 					Vec3 virtualRobotPos_Vec3(virtualRobotPos.x(), virtualRobotPos.y(), virtualRobotPos.z());
 
 					// ------------------- Compute force feedback to follow the plane ---------------- //
-                    double K_normal = 300000;
-                    double damping_normal = 0;
+                    double K_normal = 700000;
+                    double damping_normal = 70;
 
                     double d = signedDistanceToPlane(virtualRobotPos_Vec3, centroid_HapticFrame_Vec3, normal_HapticFrame_Vec3);
 					Vec3 hapticVel_Vec3(hapticVel.x(), hapticVel.y(), hapticVel.z());
