@@ -93,6 +93,8 @@ bool planar_exploration;
 
 int directionAlongSegment = 0;
 
+int log_counter = 0;
+
 // a flag to indicate if the simulation currently running
 bool simulationRunning = false;
 
@@ -957,12 +959,14 @@ void keyCallback(GLFWwindow* a_window, int a_key, int a_scancode, int a_action, 
                 cVector3d current_position(0,0,0);
                 switch (a_key) {
                     case GLFW_KEY_G:
+                        directionAlongSegment = 1;  // JUST TO PLOT AND DEBUG
                         outFile << "Position in x [m],Voltage [V]" << std::endl;
                         break;
                     case GLFW_KEY_H:
                         outFile << "Position in y [m],Voltage [V]" << std::endl;
                         break;
                     case GLFW_KEY_J:
+                        directionAlongSegment = -1; // JUST TO PLOT AND DEBUG
                         outFile << "Position in z [m],Voltage [V]" << std::endl;
                         robotDevice->getPosition(current_position);
                         
@@ -1573,14 +1577,13 @@ void updateRobotDevice(void)
     // get time point 0
     chrono::high_resolution_clock::time_point timePoint0 = chrono::high_resolution_clock::now();
 
-    string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\3DData\\";
+    string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\RobotData\\";
 
     time_t t = time(nullptr);
     tm* now = localtime(&t);
 
     ostringstream oss;
     oss << folder
-        << "interface_points_"
         << put_time(now, "%Y-%m-%d_%H-%M-%S")
         << ".csv";
 
@@ -1592,7 +1595,7 @@ void updateRobotDevice(void)
     static ofstream csvFile(filename, ios::app);
     if (fileIsEmpty) {
         // write header only if file is empty
-        csvFile << "x [m],y [m],z [m],Voltage [V]" << endl;
+        csvFile << "timestamp[ms],x [m],y [m],z [m],Voltage [V],directionAlongSegment" << endl;
     }
 
     // main robot control loop
@@ -1692,14 +1695,30 @@ void updateRobotDevice(void)
 
         add_value();
 
-        if (Voltage_Copy > threshold)
-        {
-            csvFile << RobotPos_Copy.x() << ","
-                << RobotPos_Copy.y() << ","
-                << RobotPos_Copy.z() << ","
-                << Voltage_Copy << endl;
+        
 
-            csvFile.flush(); // guarantee data is written to file immediately
+        //if (Voltage_Copy > threshold)
+        //{
+        //    csvFile << RobotPos_Copy.x() << ","
+        //        << RobotPos_Copy.y() << ","
+        //        << RobotPos_Copy.z() << ","
+        //        << Voltage_Copy << endl;
+
+        //    csvFile.flush(); // guarantee data is written to file immediately
+        //}
+
+        auto now_time = chrono::steady_clock::now();
+        long long timestamp_ms = chrono::duration_cast<chrono::milliseconds>(now_time.time_since_epoch()).count();
+
+        if (directionAlongSegment == 1 || directionAlongSegment == -1) {
+
+            csvFile << timestamp_ms << ","
+                << robotPosCur.x() << ","
+                << robotPosCur.y() << ","
+                << robotPosCur.z() << ","
+                << voltageLevel << ","
+                << directionAlongSegment
+                << endl;
         }
 
 
@@ -1836,7 +1855,18 @@ void updateHapticDevice(void)
             << "voltageLevel[V],"
             << "THGsignal,"
             << "robotPos_x[m],robotPos_y[m],robotPos_z[m],"
-            << "directionAlongSegment"
+            << "directionAlongSegment,"
+            << "distanceToLine,"
+           /* << "perpendicularDirectionToLine_x,"*/
+            << "pointA_HapticFrame_x,"
+            << "pointA_HapticFrame_y,"
+            << "pointA_HapticFrame_z,"
+            << "pointB_HapticFrame_x,"
+            << "pointB_HapticFrame_y,"
+            << "pointB_HapticFrame_z,"
+            << "virtualRobotPos_HapticFrame_x,"
+            << "virtualRobotPos_HapticFrame_y,"
+            << "virtualRobotPos_HapticFrame_z"
             << endl;
     }
 
@@ -2243,8 +2273,11 @@ void updateHapticDevice(void)
                     cVector3d F_line_haptic(F_perp[0], F_perp[1], F_perp[2]);
                     force += F_line_haptic;
 
-                   
-					// Log data about line forces for debugging
+                    //log_counter++;
+
+                    //if (log_counter % 100 == 0) {   // Downsampling 
+
+                        // Log data about line forces for debugging
                     auto now_time_line = chrono::steady_clock::now();
                     long long timestamp_ms_line = chrono::duration_cast<chrono::milliseconds>(now_time_line.time_since_epoch()).count();
 
@@ -2255,13 +2288,24 @@ void updateHapticDevice(void)
                         << robotPos.x() << ","
                         << robotPos.y() << ","
                         << robotPos.z() << ","
-                        << directionAlongSegment
+                        << directionAlongSegment << ","
+                        << dist_perp << ","
+                        /*<< dir_perp << ","*/    // ATTENTION --> IL FAUT DIFFERENCIER X Y ET Z SINON BUG DANS LE CSV
+                        << A_HapticFrame.x() << ","
+                        << A_HapticFrame.y() << ","
+                        << A_HapticFrame.z() << ","
+                        << B_HapticFrame.x() << ","
+                        << B_HapticFrame.y() << ","
+                        << B_HapticFrame.z() << ","
+                        << virtualRobotPos.x() << ","
+                        << virtualRobotPos.y() << ","
+                        << virtualRobotPos.z() 
                         << endl;
 
                     // forcer le flush pour sauvegarder en temps réel
                     csvFilePlane.flush();
 
-
+                    /*}*/
 
                     // haptic feedback to follow the plane detected is coded for the manipulating robot in the robot thread
                     // normally we will feel on the haptic robot that the manipulating robot is constrained to follow a plane
@@ -2703,9 +2747,9 @@ void auto_scan(void) {
  
         }
         i++;
-        if (scan_x) scan_vector.set(-1 * microns, 0, 0);
+        if (scan_x) scan_vector.set(0.01 * microns, 0, 0);
         else if (scan_y) scan_vector.set(0, 1 * microns, 0);
-        else if (scan_z) scan_vector.set(0, 0, 1 * microns);
+        else if (scan_z) scan_vector.set(-0.01 * microns, 0, 0);  // ---------------- ATTENTION J'AI TRANSFORMÉ SCAN Z EN SCAN -X --------------------------- //
         robotPosDes = robotPosDes + scan_vector;
         //cout <<"x: " << robotPosCur.x() << ", y:  " << robotPosCur.y() << ",z : " << robotPosCur.z() << endl;
     }
