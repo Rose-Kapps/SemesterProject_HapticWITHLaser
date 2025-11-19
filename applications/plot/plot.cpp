@@ -56,7 +56,8 @@ enum cState
     STATE_IDLE,
     STATE_TELEOPERATION,
 	FIND_INTERFACE,
-	PLANAR_EXPLORATION
+	PLANAR_EXPLORATION,
+    LINEAR_EXPLORATION
 };
 
 //------------------------------------------------------------------------------
@@ -89,6 +90,8 @@ double zPosDesired;
 bool interface_point_taken;
 bool find_interface;
 bool planar_exploration;
+
+int directionAlongSegment = 0;
 
 // a flag to indicate if the simulation currently running
 bool simulationRunning = false;
@@ -399,6 +402,44 @@ void planeBasis(const Vec3& normal, Vec3& u, Vec3& v) {
     u = n.cross(tmp).normalized();
     v = n.cross(u).normalized();
 }
+
+// Projection orthogonale d’un point sur la droite AB
+Vec3 projectPointToLine(const Vec3& P, const Vec3& A, const Vec3& B) {
+    Vec3 AB = B - A;
+    Vec3 AP = P - A;
+    double t = AP.dot(AB) / AB.dot(AB);  // projection scalaire
+    return A + t * AB;
+}
+
+// Distance signée perpendiculaire à la droite
+double distanceToLine(const Vec3& P, const Vec3& A, const Vec3& B) {
+    Vec3 proj = projectPointToLine(P, A, B);
+    return (P - proj).norm();
+}
+
+// Direction perpendiculaire normalisée (force direction)
+Vec3 perpendicularDirectionToLine(const Vec3& P, const Vec3& A, const Vec3& B) {
+    Vec3 proj = projectPointToLine(P, A, B);
+    Vec3 d = P - proj;
+    double n = d.norm();
+    if (n < 1e-9) return Vec3::Zero();
+    return d / n;
+}
+
+double computeT(const Vec3& P, const Vec3& A, const Vec3& B)
+{
+    Vec3 AB = B - A;
+    Vec3 AP = P - A;
+
+    double denom = AB.dot(AB);
+    if (denom < 1e-12) return 0.0; // A et B identiques, sécurité
+
+    double t = AP.dot(AB) / denom;
+
+    return t;
+}
+
+
 
 bool isFarEnough(const vector<Vec3>& points, const Vec3& newPoint, double threshold) {
     for (const auto& p : points) {
@@ -1709,6 +1750,7 @@ void updateHapticDevice(void)
 
     string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\HapticDebugV2\\";
     string folderPlane = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\PlaneForces\\";
+	string folderTHGLineScanning = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\THGLineScanning\\";
 
     // Création du nom de fichier avec timestamp
     time_t t = time(nullptr);
@@ -1773,6 +1815,28 @@ void updateHapticDevice(void)
             << "vel_normal[m/s],"
             << "F_normalWITHOUTdamping_x[N],F_normalWITHOUTdamping_y[N],F_normalWITHOUTdamping_z[N],"
             << "F_normalWITHdamping_x[N],F_normalWITHdamping_y[N],F_normalWITHdamping_z[N]"
+            << endl;
+    }
+
+	// Nom du troisième fichier 
+    ostringstream ossTHGLineScanning;
+	ossTHGLineScanning << folderTHGLineScanning
+        << "THGLineScanning_"
+        << put_time(now, "%Y-%m-%d_%H-%M-%S")
+        << ".csv";
+
+    const string filename_THGLineScanning = ossTHGLineScanning.str();
+
+    bool fileIsEmpty_THGLineScanning = !fs::exists(filename_THGLineScanning) || fs::file_size(filename_THGLineScanning) == 0;
+
+    static ofstream csvFile_THGLineScanning(filename_THGLineScanning, ios::app);
+    if (fileIsEmpty_THGLineScanning) {
+        csvFile_THGLineScanning << "timestamp_ms,"
+            << "t,"
+            << "voltageLevel[V],"
+            << "THGsignal,"
+            << "robotPos_x[m],robotPos_y[m],robotPos_z[m],"
+            << "directionAlongSegment"
             << endl;
     }
 
@@ -2086,29 +2150,31 @@ void updateHapticDevice(void)
 
                     // If enough interface points --> planar approximation + next state
 
-                    if (list_of_interface_points.size() >= 3) { // threshold value to adpat
+                    if (list_of_interface_points.size() >= 2) { // threshold value to adpat
 
                         cout << "Enough interface points collected: " << list_of_interface_points.size() << " points." << endl;
 
-                        fitPlaneSVD(list_of_interface_points, centroid, normal, singularValues);
-                        planeBasis(normal, u, v);
 
-                        // debugging output
-                        std::cout << "Centroid: " << centroid.transpose() << "\n";
-                        std::cout << "Normal (unit): " << normal.transpose() << "\n";
-                        std::cout << "Singular values: " << singularValues.transpose() << "\n";
-                        std::cout << "Plane basis u: " << u.transpose() << "\n";
-                        std::cout << "Plane basis v: " << v.transpose() << "\n\n";
+						//// ----- For planar approcimation ----- //
+      //                  fitPlaneSVD(list_of_interface_points, centroid, normal, singularValues);
+      //                  planeBasis(normal, u, v);
+
+      //                  // debugging output
+      //                  std::cout << "Centroid: " << centroid.transpose() << "\n";
+      //                  std::cout << "Normal (unit): " << normal.transpose() << "\n";
+      //                  std::cout << "Singular values: " << singularValues.transpose() << "\n";
+      //                  std::cout << "Plane basis u: " << u.transpose() << "\n";
+      //                  std::cout << "Plane basis v: " << v.transpose() << "\n\n";
+						//// ------------------------------------ //
 
                         // change haptic state
-                        haptic_state = PLANAR_EXPLORATION;
+                        haptic_state = LINEAR_EXPLORATION;
                         find_interface = 0;
 
                     }
                 }
 
-
-                else if (haptic_state == PLANAR_EXPLORATION) {
+                else if (haptic_state == LINEAR_EXPLORATION) {
 
                     interface_point_taken = 0;
 
@@ -2116,85 +2182,86 @@ void updateHapticDevice(void)
                         cout << "Beginning of planar exploration" << endl;
                     }
 
-                    planar_exploration = 1; 
+                    planar_exploration = 1;
 
-					// ----- Transformation de tout ce dont on a besoin dans le repère du haptic device ---- //
+                    // ----- Transformation de tout ce dont on a besoin dans le repère du haptic device ---- //
 
-					cVector3d normal_HapticFrame = robotRot * cVector3d(normal[0], normal[1], normal[2]);
-					cVector3d centroid_HapticFrame = robotRot * cVector3d(centroid[0], centroid[1], centroid[2]);
+                    cVector3d A_HapticFrame = robotRot * cVector3d(list_of_interface_points[0][0], list_of_interface_points[0][1], list_of_interface_points[0][2]);
+                    cVector3d B_HapticFrame = robotRot * cVector3d(list_of_interface_points[1][0], list_of_interface_points[1][1], list_of_interface_points[1][2]);
 
-					// ------------------- CONVERSION EN VEC3 POUR UTILISER LES FONCTIONS DE EIGEN ---------------- //
-
-					Vec3 normal_HapticFrame_Vec3(normal_HapticFrame.x(), normal_HapticFrame.y(), normal_HapticFrame.z());
-					Vec3 centroid_HapticFrame_Vec3(centroid_HapticFrame.x(), centroid_HapticFrame.y(), centroid_HapticFrame.z());
-
-					/*Vec3 robotPos0_Vec3(robotPos0.x(), robotPos0.y(), robotPos0.z());*/
-
-					// ------------------- Compute virtual position of the manipulating robot in the haptic frame ---------------- //
-
-					cVector3d virtualRobotPos = robotRot * robotPos0 + scaleFactor * (hapticPos - hapticPos0);
-                    
                     // ------------------- CONVERSION EN VEC3 POUR UTILISER LES FONCTIONS DE EIGEN ---------------- //
 
-					Vec3 virtualRobotPos_Vec3(virtualRobotPos.x(), virtualRobotPos.y(), virtualRobotPos.z());
+                    Vec3 A_HapticFrame_Vec3(A_HapticFrame.x(), A_HapticFrame.y(), A_HapticFrame.z());
+                    Vec3 B_HapticFrame_Vec3(B_HapticFrame.x(), B_HapticFrame.y(), B_HapticFrame.z());
 
-					// ------------------- Compute force feedback to follow the plane ---------------- //
-                    double K_normal = 700000;
-                    double damping_normal = 70;
+                    /*Vec3 robotPos0_Vec3(robotPos0.x(), robotPos0.y(), robotPos0.z());*/
 
-                    double d = signedDistanceToPlane(virtualRobotPos_Vec3, centroid_HapticFrame_Vec3, normal_HapticFrame_Vec3);
-					Vec3 hapticVel_Vec3(hapticVel.x(), hapticVel.y(), hapticVel.z());
-					double vel_normal = hapticVel_Vec3.dot(normal_HapticFrame_Vec3);
+                    // ------------------- Compute virtual position of the manipulating robot in the haptic frame ---------------- //
 
-                    Vec3 F_normal_without_damping = -K_normal * d * normal_HapticFrame_Vec3;
-                    //cout << "FnormalW/damping: " << F_normal_without_damping << endl;
-                    Vec3 F_normal_with_damping = F_normal_without_damping - damping_normal * vel_normal * normal_HapticFrame_Vec3;
-                    //cout << "FnormalWdamping: " << F_normal_with_damping << endl;
+                    cVector3d virtualRobotPos = robotRot * robotPos0 + scaleFactor * (hapticPos - hapticPos0);
 
-                    cVector3d F_normal_converted(F_normal_with_damping[0], F_normal_with_damping[1], F_normal_with_damping[2]);
-					force += F_normal_converted;
+                    // ------------------- CONVERSION EN VEC3 POUR UTILISER LES FONCTIONS DE EIGEN ---------------- //
 
-     //               Vec3 velocity(robotVel.x(), robotVel.y(), robotVel.z());
-     //               double vel_normal = velocity.dot(normal);
+                    Vec3 virtualRobotPos_Vec3(virtualRobotPos.x(), virtualRobotPos.y(), virtualRobotPos.z());
 
-     //               Vec3 robotPosCur_Vec3(robotPos.x(), robotPos.y(), robotPos.z());
+					// Compute haptic force to follow the line defined by points A and B
+                    double dist_perp = distanceToLine(virtualRobotPos_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3);
+                    Vec3 dir_perp = perpendicularDirectionToLine(virtualRobotPos_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3);
 
-     //               // compute spring force to make the manipulating robot follow the plane 
+                    double t = computeT(virtualRobotPos_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3); // just for plotting
 
-					//// Tester différentes valeurs de stiffness et de damping (garder en tête ratio 700,70 qui marchait bien avec hapticPos et hapticVel)
-     //               double K_normal = 300000;
-     //               double damping_normal = 0;
-     //               double d = signedDistanceToPlane(robotPosCur_Vec3, centroid, normal);
-     //               //cout << "d: " << d << endl;
+					// Direction vector of the line AB
+                    Vec3 AB = B_HapticFrame_Vec3 - A_HapticFrame_Vec3;
+                    Vec3 uAB = AB.normalized();
 
-     //               Vec3 F_normal_without_damping = -K_normal * d * normal;
-     //               //cout << "FnormalW/damping: " << F_normal_without_damping << endl;
-     //               Vec3 F_normal_with_damping = F_normal_without_damping -damping_normal * vel_normal * normal;
-     //               //cout << "FnormalWdamping: " << F_normal_with_damping << endl;
+                    // Stiffness & damping
+                    double K_line = 700000;
+                    double B_line = 70;
 
+                    // Vitesse perpendiculaire : projeter la vitesse sur la direction perpendiculaire
+                    Vec3 V(hapticVel.x(), hapticVel.y(), hapticVel.z());
+                    double vel_normal = V.dot(dir_perp);
 
-     //               cVector3d F_normal_converted(F_normal_with_damping[0], F_normal_with_damping[1], F_normal_with_damping[2]);
-     //               cVector3d F_normal_HapticFrame = robotRot * F_normal_converted;
-     //               force += F_normal_HapticFrame;
+					// Projeter la vitesse sur la direction de la ligne
+                    double velAlong = V.dot(uAB);
 
-                    auto now_time_plane = chrono::steady_clock::now();
-                    long long timestamp_ms_plane = chrono::duration_cast<chrono::milliseconds>(now_time_plane.time_since_epoch()).count();
+                    // 4. Mise à jour de l’état global
+                    if (velAlong > 1e-6) {
+                        directionAlongSegment = +1;  // l'utilisateur va vers B
+                    }
+                    else if (velAlong < -1e-6) {
+                        directionAlongSegment = -1;  // l'utilisateur va vers A
+                    }
+                    else {
+                        directionAlongSegment = 0;   // immobile ou mouvement transversal
+                    }
 
-                    csvFilePlane << timestamp_ms_plane << ","
-                        << d << ","
-                        << vel_normal << ","
-                        << F_normal_without_damping[0] << ","
-                        << F_normal_without_damping[1] << ","
-                        << F_normal_without_damping[2] << ","
-                        << F_normal_with_damping[0] << ","
-                        << F_normal_with_damping[1] << ","
-                        << F_normal_with_damping[2]
+                    // Force haptique perpendiculaire
+                    Vec3 F_perp = -K_line * dist_perp * dir_perp - B_line * vel_normal * dir_perp;
+
+                    // Conversion vers CHAI3D
+                    cVector3d F_line_haptic(F_perp[0], F_perp[1], F_perp[2]);
+                    force += F_line_haptic;
+
+                   
+					// Log data about line forces for debugging
+                    auto now_time_line = chrono::steady_clock::now();
+                    long long timestamp_ms_line = chrono::duration_cast<chrono::milliseconds>(now_time_line.time_since_epoch()).count();
+
+                    csvFile_THGLineScanning << timestamp_ms_line << ","
+                        << t << ","
+                        << voltageLevel << ","
+                        << THGsignal << ","
+                        << robotPos.x() << ","
+                        << robotPos.y() << ","
+                        << robotPos.z() << ","
+                        << directionAlongSegment
                         << endl;
 
                     // forcer le flush pour sauvegarder en temps réel
-                     csvFilePlane.flush();
+                    csvFilePlane.flush();
 
-                    
+
 
                     // haptic feedback to follow the plane detected is coded for the manipulating robot in the robot thread
                     // normally we will feel on the haptic robot that the manipulating robot is constrained to follow a plane
@@ -2214,7 +2281,115 @@ void updateHapticDevice(void)
                     //}
 
 
-                }
+                    }
+
+    //            else if (haptic_state == PLANAR_EXPLORATION) {
+
+    //                interface_point_taken = 0;
+
+    //                if (planar_exploration == 0) {
+    //                    cout << "Beginning of planar exploration" << endl;
+    //                }
+
+    //                planar_exploration = 1; 
+
+				//	// ----- Transformation de tout ce dont on a besoin dans le repère du haptic device ---- //
+
+				//	cVector3d normal_HapticFrame = robotRot * cVector3d(normal[0], normal[1], normal[2]);
+				//	cVector3d centroid_HapticFrame = robotRot * cVector3d(centroid[0], centroid[1], centroid[2]);
+
+				//	// ------------------- CONVERSION EN VEC3 POUR UTILISER LES FONCTIONS DE EIGEN ---------------- //
+
+				//	Vec3 normal_HapticFrame_Vec3(normal_HapticFrame.x(), normal_HapticFrame.y(), normal_HapticFrame.z());
+				//	Vec3 centroid_HapticFrame_Vec3(centroid_HapticFrame.x(), centroid_HapticFrame.y(), centroid_HapticFrame.z());
+
+				//	/*Vec3 robotPos0_Vec3(robotPos0.x(), robotPos0.y(), robotPos0.z());*/
+
+				//	// ------------------- Compute virtual position of the manipulating robot in the haptic frame ---------------- //
+
+				//	cVector3d virtualRobotPos = robotRot * robotPos0 + scaleFactor * (hapticPos - hapticPos0);
+    //                
+    //                // ------------------- CONVERSION EN VEC3 POUR UTILISER LES FONCTIONS DE EIGEN ---------------- //
+
+				//	Vec3 virtualRobotPos_Vec3(virtualRobotPos.x(), virtualRobotPos.y(), virtualRobotPos.z());
+
+				//	// ------------------- Compute force feedback to follow the plane ---------------- //
+    //                double K_normal = 700000;
+    //                double damping_normal = 70;
+
+    //                double d = signedDistanceToPlane(virtualRobotPos_Vec3, centroid_HapticFrame_Vec3, normal_HapticFrame_Vec3);
+				//	Vec3 hapticVel_Vec3(hapticVel.x(), hapticVel.y(), hapticVel.z());
+				//	double vel_normal = hapticVel_Vec3.dot(normal_HapticFrame_Vec3);
+
+    //                Vec3 F_normal_without_damping = -K_normal * d * normal_HapticFrame_Vec3;
+    //                //cout << "FnormalW/damping: " << F_normal_without_damping << endl;
+    //                Vec3 F_normal_with_damping = F_normal_without_damping - damping_normal * vel_normal * normal_HapticFrame_Vec3;
+    //                //cout << "FnormalWdamping: " << F_normal_with_damping << endl;
+
+    //                cVector3d F_normal_converted(F_normal_with_damping[0], F_normal_with_damping[1], F_normal_with_damping[2]);
+				//	force += F_normal_converted;
+
+    // //               Vec3 velocity(robotVel.x(), robotVel.y(), robotVel.z());
+    // //               double vel_normal = velocity.dot(normal);
+
+    // //               Vec3 robotPosCur_Vec3(robotPos.x(), robotPos.y(), robotPos.z());
+
+    // //               // compute spring force to make the manipulating robot follow the plane 
+
+				//	//// Tester différentes valeurs de stiffness et de damping (garder en tête ratio 700,70 qui marchait bien avec hapticPos et hapticVel)
+    // //               double K_normal = 300000;
+    // //               double damping_normal = 0;
+    // //               double d = signedDistanceToPlane(robotPosCur_Vec3, centroid, normal);
+    // //               //cout << "d: " << d << endl;
+
+    // //               Vec3 F_normal_without_damping = -K_normal * d * normal;
+    // //               //cout << "FnormalW/damping: " << F_normal_without_damping << endl;
+    // //               Vec3 F_normal_with_damping = F_normal_without_damping -damping_normal * vel_normal * normal;
+    // //               //cout << "FnormalWdamping: " << F_normal_with_damping << endl;
+
+
+    // //               cVector3d F_normal_converted(F_normal_with_damping[0], F_normal_with_damping[1], F_normal_with_damping[2]);
+    // //               cVector3d F_normal_HapticFrame = robotRot * F_normal_converted;
+    // //               force += F_normal_HapticFrame;
+
+    //                auto now_time_plane = chrono::steady_clock::now();
+    //                long long timestamp_ms_plane = chrono::duration_cast<chrono::milliseconds>(now_time_plane.time_since_epoch()).count();
+
+    //                csvFilePlane << timestamp_ms_plane << ","
+    //                    << d << ","
+    //                    << vel_normal << ","
+    //                    << F_normal_without_damping[0] << ","
+    //                    << F_normal_without_damping[1] << ","
+    //                    << F_normal_without_damping[2] << ","
+    //                    << F_normal_with_damping[0] << ","
+    //                    << F_normal_with_damping[1] << ","
+    //                    << F_normal_with_damping[2]
+    //                    << endl;
+
+    //                // forcer le flush pour sauvegarder en temps réel
+    //                 csvFilePlane.flush();
+
+    //                
+
+    //                // haptic feedback to follow the plane detected is coded for the manipulating robot in the robot thread
+    //                // normally we will feel on the haptic robot that the manipulating robot is constrained to follow a plane
+
+    ////                  // éventuellement ajouter une force qui restitue la force appliquée au manipulateur au robot haptique 
+    //                //cVector3d force_haptic = robotRot * force_robot;
+
+    //                // Drops of the signal = we are not on the interface anymore --> back to state 1
+
+    //                //if (voltageLevel < 1.5) { // threshold to adapt
+
+    //                //    cout << "Signal lost, going back to interface finding" << endl;
+    //                //    haptic_state = FIND_INTERFACE;
+    //                //    list_of_interface_points.clear();
+    //                //    planar_exploration = 0;
+
+    //                //}
+
+
+    //            }     ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
                     ////////////////////////////////////////////////////////////////////////////////////////////////////
