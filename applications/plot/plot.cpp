@@ -95,6 +95,8 @@ int directionAlongSegment = 0;
 
 int log_counter = 0;
 
+cVector3d lastVirtualRobotPos(0,0,0);
+
 // a flag to indicate if the simulation currently running
 bool simulationRunning = false;
 
@@ -1770,6 +1772,7 @@ void updateHapticDevice(void)
     string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\HapticDebugV2\\";
     string folderPlane = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\PlaneForces\\";
 	string folderTHGLineScanning = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\THGLineScanning\\";
+    string folderTHGAutoScan = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\THGAutoScan\\";
 
     // Création du nom de fichier avec timestamp
     time_t t = time(nullptr);
@@ -1867,6 +1870,39 @@ void updateHapticDevice(void)
             << "virtualRobotPos_HapticFrame_x,"
             << "virtualRobotPos_HapticFrame_y,"
             << "virtualRobotPos_HapticFrame_z"
+            << endl;
+    }
+
+    // Nom du quatrième fichier 
+    ostringstream ossTHGAutoScan;
+	ossTHGAutoScan << folderTHGAutoScan
+        << "THGAutoScan_"
+        << put_time(now, "%Y-%m-%d_%H-%M-%S")
+        << ".csv";
+
+    const string filename_THGAutoScan = ossTHGAutoScan.str();
+
+    bool fileIsEmpty_THGAutoScan = !fs::exists(filename_THGAutoScan) || fs::file_size(filename_THGAutoScan) == 0;
+
+    static ofstream csvFile_THGAutoScan(filename_THGAutoScan, ios::app);
+    if (fileIsEmpty_THGAutoScan) {
+        csvFile_THGAutoScan << "timestamp_ms,"
+            << "t,"
+            << "voltageLevel[V],"
+            << "THGsignal,"
+            /*<< "robotPos_x[m],robotPos_y[m],robotPos_z[m],"*/
+            << "directionAlongSegment"
+            //<< "distanceToLine,"
+            ///* << "perpendicularDirectionToLine_x,"*/
+            //<< "pointA_HapticFrame_x,"
+            //<< "pointA_HapticFrame_y,"
+            //<< "pointA_HapticFrame_z,"
+            //<< "pointB_HapticFrame_x,"
+            //<< "pointB_HapticFrame_y,"
+            //<< "pointB_HapticFrame_z,"
+            //<< "virtualRobotPos_HapticFrame_x,"
+            //<< "virtualRobotPos_HapticFrame_y,"
+            //<< "virtualRobotPos_HapticFrame_z"
             << endl;
     }
 
@@ -2033,6 +2069,43 @@ void updateHapticDevice(void)
                 state = STATE_TELEOPERATION;
             }
 
+            if ( scan_x == true || scan_y == true || scan_z == true ) {   // log data during scanning 
+                 
+                if (scan_x == true) {
+					directionAlongSegment = 1;
+                }
+                else if (scan_z == true) {
+                    directionAlongSegment = -1;
+				}
+
+                // Convert robotPos in Vec3
+
+				Vec3 robotPos_Vec3(robotPos.x(), robotPos.y(), robotPos.z());
+
+				double t = computeT(robotPos_Vec3, list_of_interface_points[0], list_of_interface_points[1]);
+
+				auto now_time_autoscan = chrono::steady_clock::now();
+				long long timestamp_ms_autoscan = chrono::duration_cast<chrono::milliseconds>(now_time_autoscan.time_since_epoch()).count();
+
+                csvFile_THGAutoScan << timestamp_ms_autoscan << ","
+                    << t << ","
+                    << voltageLevel << ","
+                    << THGsignal << ","
+                    << directionAlongSegment
+                    //<< distanceToLine << ","
+                    ///*<< perpendicularDirectionToLine.x() << ","*/
+                    //<< pointA_HapticFrame.x() << ","
+                    //<< pointA_HapticFrame.y() << ","
+                    //<< pointA_HapticFrame.z() << ","
+                    //<< pointB_HapticFrame.x() << ","
+                    //<< pointB_HapticFrame.y() << ","
+                    //<< pointB_HapticFrame.z() << ","
+                    //<< virtualRobotPos.x() << ","
+                    //<< virtualRobotPos.y() << ","
+                    //<< virtualRobotPos.z()
+					<< endl;
+			}
+
 
         }
 
@@ -2045,6 +2118,7 @@ void updateHapticDevice(void)
             if (userButton == false)
             {
                 // user has released button, go into idle mode
+				lastVirtualRobotPos = virtualRobotPos;
                 state = STATE_IDLE;
             }
             else
@@ -2228,7 +2302,14 @@ void updateHapticDevice(void)
 
                     // ------------------- Compute virtual position of the manipulating robot in the haptic frame ---------------- //
 
-                    cVector3d virtualRobotPos = robotRot * robotPos0 + scaleFactor * (hapticPos - hapticPos0);
+					cVector3d virtualRobotPos(0, 0, 0);
+
+                    if (lastVirtualRobotPos.x() == 0 && lastVirtualRobotPos.y() == 0 && lastVirtualRobotPos.z() == 0) {
+                        virtualRobotPos = robotRot * robotPos0 + scaleFactor * (hapticPos - hapticPos0);
+					}
+                    else {
+                        virtualRobotPos = lastVirtualRobotPos + scaleFactor * (hapticPos - hapticPos0);
+                    }
 
                     // ------------------- CONVERSION EN VEC3 POUR UTILISER LES FONCTIONS DE EIGEN ---------------- //
 
