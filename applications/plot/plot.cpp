@@ -1515,8 +1515,8 @@ void updateSensor(void)
             
             
             // --- Compute raw voltage ---
-            //voltageRaw = round(100 * cClamp(5.0 * (((double)dataValue - 2048.0) / 964.0), 0.0, 5.0)) / 100;
-            voltageRaw = cClamp(5.0 * (((double)dataValue - 2048.0) / 964.0), 0.0, 5.0);
+            voltageRaw = round(100 * cClamp(5.0 * (((double)dataValue - 2048.0) / 964.0), 0.0, 5.0)) / 100;
+            /*voltageRaw = cClamp(5.0 * (((double)dataValue - 2048.0) / 964.0), 0.0, 5.0);*/
 
             voltageSmoothed = cClamp(5.0 * (((double)smoothed_ADCvalue - 2048.0) / 964.0), 0.0, 5.0);
 
@@ -1581,16 +1581,17 @@ void updateRobotDevice(void)
     // get time point 0
     chrono::high_resolution_clock::time_point timePoint0 = chrono::high_resolution_clock::now();
 
-    /*string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\RobotData\\";*/
+    //string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\RobotData\\";
     string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\3DData\\";
+    string folder_XScan = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\X-Scan\\";
 
-
+    
     time_t t = time(nullptr);
     tm* now = localtime(&t);
 
     ostringstream oss;
     oss << folder
-        << "interface_points_"
+        /*<< "interface_points_"*/
         << put_time(now, "%Y-%m-%d_%H-%M-%S")
         << ".csv";
 
@@ -1612,6 +1613,31 @@ void updateRobotDevice(void)
         csvFile << "x [m],y [m],z [m],Voltage [V]" << endl;
     }
 
+    // Deuxieme fichier csv ////////////////////
+    ostringstream oss_XScan;
+    oss_XScan << folder_XScan
+        /*<< "interface_points_"*/
+        << put_time(now, "%Y-%m-%d_%H-%M-%S")
+        << ".csv";
+
+    const string filename_XScan = oss_XScan.str();
+
+    bool fileIsEmpty_XScan = !fs::exists(filename_XScan) || fs::file_size(filename_XScan) == 0;
+
+    //// open csv file to log interface points
+    //static ofstream csvFile(filename, ios::app);
+    //if (fileIsEmpty) {
+    //    // write header only if file is empty
+    //    csvFile << "timestamp[ms],x [m],y [m],z [m],Voltage [V],directionAlongSegment" << endl;
+    //}
+
+    // open csv file to log interface points
+    static ofstream csvFile_XScan(filename_XScan, ios::app);
+    if (fileIsEmpty_XScan) {
+        // write header only if file is empty
+        csvFile_XScan << "timestamps_ms,robotPos_x[m],robotPos_y[m],robotPos_z[m],robotVel_x,robotVel_y,robotVel_z" << endl;
+    }
+
     // main robot control loop
     while (simulationRunning)
     {
@@ -1628,7 +1654,22 @@ void updateRobotDevice(void)
         cVector3d vel(0, 0, 0);
         robotDevice->getLinearVelocity(vel);
 
-		
+        auto now_time = chrono::steady_clock::now();
+        long long timestamp_ms = chrono::duration_cast<chrono::milliseconds>(now_time.time_since_epoch()).count();
+
+        if (scan_x == true || scan_y == true) {
+
+            csvFile_XScan << timestamp_ms << ","
+                << pos.x() << ","
+                << pos.y() << ","
+                << pos.z() << ","
+                << vel.x() << ","
+                << vel.y() << ","
+                << vel.z()
+                << endl;
+
+        }
+
 
         // acquire mutex
         mutexDevices.acquire();
@@ -1783,8 +1824,10 @@ void updateHapticDevice(void)
 
     string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\HapticDebugV2\\";
     string folderPlane = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\PlaneForces\\";
-	string folderTHGLineScanning = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\THGLineScanning\\";
+	string folderTHGLineScanning = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\THGLineScanningV2\\";
     string folderTHGAutoScan = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\THGAutoScan\\";
+    string folderZScan = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\Z-Scan\\";
+
 
     // Création du nom de fichier avec timestamp
     time_t t = time(nullptr);
@@ -1881,7 +1924,10 @@ void updateHapticDevice(void)
             << "pointB_HapticFrame_z,"
             << "virtualRobotPos_HapticFrame_x,"
             << "virtualRobotPos_HapticFrame_y,"
-            << "virtualRobotPos_HapticFrame_z"
+            << "virtualRobotPos_HapticFrame_z,"
+            << "robotPos_HapticFrame_x,"
+            << "robotPos_HapticFrame_y,"
+            << "robotPos_HapticFrame_z"
             << endl;
     }
 
@@ -1917,6 +1963,26 @@ void updateHapticDevice(void)
             //<< "virtualRobotPos_HapticFrame_z"
             << endl;
     }
+
+    //Nom du cinquième fichier csv
+    ostringstream ossZScan;
+    ossZScan << folderZScan
+        << "leica_objective_"
+        << put_time(now, "%Y-%m-%d_%H-%M-%S")
+        << ".csv";
+
+    const string filename_ZScan = ossZScan.str();
+
+    bool fileIsEmpty_ZScan = !fs::exists(filename_ZScan) || fs::file_size(filename_ZScan) == 0;
+
+    static ofstream csvFile_ZScan(filename_ZScan, ios::app);
+    if (fileIsEmpty_ZScan) {
+        csvFile_ZScan 
+            << "voltageLevel[V],"
+            << "robotPos_z[m]"
+            << endl;
+    }
+
 
     //cVector3d Fz_stiff(0.0, 0.0, 0.0);  /////////////////////////////////////////////////
 
@@ -1977,7 +2043,7 @@ void updateHapticDevice(void)
         double max_voltage = 0.0;
 
         if (scaleFactor == 0.02) {
-            max_voltage = 0.7;
+            max_voltage = 0.5;
         }
         else if (scaleFactor == 0.001) {
             max_voltage = 1.2;
@@ -2081,12 +2147,12 @@ void updateHapticDevice(void)
                 state = STATE_TELEOPERATION;
             }
 
-            if ( scan_x == true || scan_y == true || scan_z == true ) {   // log data during scanning 
+            if ( scan_x == true || scan_y == true) {   // log data during scanning 
                  
                 if (scan_x == true) {
 					directionAlongSegment = 1;
                 }
-                else if (scan_z == true) {
+                else if (scan_y == true) {
                     directionAlongSegment = -1;
 				}
 
@@ -2094,7 +2160,9 @@ void updateHapticDevice(void)
 
 				Vec3 robotPos_Vec3(robotPos.x(), robotPos.y(), robotPos.z());
 
-				double t = computeT(robotPos_Vec3, list_of_interface_points[0], list_of_interface_points[1]);
+				/*double t = computeT(robotPos_Vec3, list_of_interface_points[0], list_of_interface_points[1]);*/
+
+                double t = 0.0;
 
 				auto now_time_autoscan = chrono::steady_clock::now();
 				long long timestamp_ms_autoscan = chrono::duration_cast<chrono::milliseconds>(now_time_autoscan.time_since_epoch()).count();
@@ -2118,6 +2186,14 @@ void updateHapticDevice(void)
 					<< endl;
 			}
 
+            if (scan_z == true) {
+                csvFile_ZScan
+                    << voltageLevel << ","
+                    << robotPos.z()
+                    << endl;
+
+            }
+
 
         }
 
@@ -2131,7 +2207,7 @@ void updateHapticDevice(void)
             {
                 // user has released button, go into idle mode
 				lastVirtualRobotPos = virtualRobotPos;
-                cout << "lastVirtualRobotPos = " << lastVirtualRobotPos << endl;
+               /* cout << "lastVirtualRobotPos = " << lastVirtualRobotPos << endl;*/
                 state = STATE_IDLE;
             }
             else
@@ -2303,6 +2379,8 @@ void updateHapticDevice(void)
 
                     // ----- Transformation de tout ce dont on a besoin dans le repère du haptic device ---- //
 
+                    cVector3d robotPos_HapticFrame = robotRot * robotPos;
+
                     cVector3d A_HapticFrame = robotRot * cVector3d(list_of_interface_points[0][0], list_of_interface_points[0][1], list_of_interface_points[0][2]);
                     cVector3d B_HapticFrame = robotRot * cVector3d(list_of_interface_points[1][0], list_of_interface_points[1][1], list_of_interface_points[1][2]);
 
@@ -2317,21 +2395,21 @@ void updateHapticDevice(void)
 
 					/*cVector3d virtualRobotPos(0, 0, 0);*/  // A DECLARER EN GLOBAL ?????
 
-                    if (lastVirtualRobotPos.x() == 0 && lastVirtualRobotPos.y() == 0 && lastVirtualRobotPos.z() == 0) {
-                        cout << "Première virtual robot pos" << endl;
-                        virtualRobotPos = robotRot * robotPos0 + scaleFactor * (hapticPos - hapticPos0);
-					}
-                    else {
-                        virtualRobotPos = lastVirtualRobotPos + scaleFactor * (hapticPos - hapticPos0);
-                    }
+     //               if (lastVirtualRobotPos.x() == 0 && lastVirtualRobotPos.y() == 0 && lastVirtualRobotPos.z() == 0) {
+     //                   /*cout << "Première virtual robot pos" << endl;*/
+     //                   virtualRobotPos = robotRot * robotPos0 + scaleFactor * (hapticPos - hapticPos0);
+					//}
+     //               else {
+     //                   virtualRobotPos = lastVirtualRobotPos + scaleFactor * (hapticPos - hapticPos0);
+     //               }
 
-
+                    virtualRobotPos = robotPos_HapticFrame + scaleFactor * (hapticPos - hapticPos0);
 
                     // ------------------- CONVERSION EN VEC3 POUR UTILISER LES FONCTIONS DE EIGEN ---------------- //
 
                     Vec3 virtualRobotPos_Vec3(virtualRobotPos.x(), virtualRobotPos.y(), virtualRobotPos.z());
 
-                    cout << "vitrualRobtoPos_Vec3" << virtualRobotPos_Vec3 << endl;
+                   /* cout << "vitrualRobtoPos_Vec3" << virtualRobotPos_Vec3 << endl;*/
 
 					// Compute haptic force to follow the line defined by points A and B
                     double dist_perp = distanceToLine(virtualRobotPos_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3);
@@ -2345,7 +2423,7 @@ void updateHapticDevice(void)
 
                     // Stiffness & damping
                     double K_line = 700000;
-                    double B_line = 70;
+                    double B_line = 100;
 
                     // Vitesse perpendiculaire : projeter la vitesse sur la direction perpendiculaire
                     Vec3 V(hapticVel.x(), hapticVel.y(), hapticVel.z());
@@ -2398,7 +2476,10 @@ void updateHapticDevice(void)
                         << B_HapticFrame.z() << ","
                         << virtualRobotPos.x() << ","
                         << virtualRobotPos.y() << ","
-                        << virtualRobotPos.z() 
+                        << virtualRobotPos.z() << ","
+                        << robotPos_HapticFrame.x() << ","
+                        << robotPos_HapticFrame.y() << ","
+                        << robotPos_HapticFrame.z() 
                         << endl;
 
                     // forcer le flush pour sauvegarder en temps réel
@@ -2846,9 +2927,9 @@ void auto_scan(void) {
  
         }
         i++;
-        if (scan_x) scan_vector.set(0.01 * microns, 0, 0);
-        else if (scan_y) scan_vector.set(0, 0, -0.01 * microns);
-        else if (scan_z) scan_vector.set(-0.01 * microns, 0, 0);  // ---------------- ATTENTION J'AI TRANSFORMÉ SCAN Z EN SCAN -X --------------------------- //
+        if (scan_x) scan_vector.set(1 * microns, 0, 0);
+        else if (scan_y) scan_vector.set(-1 * microns, 0, 0);
+        else if (scan_z) scan_vector.set(0, 0, 0.1 * microns);  // ---------------- ATTENTION J'AI TRANSFORMÉ SCAN Y EN SCAN -X --------------------------- //
         robotPosDes = robotPosDes + scan_vector;
         //cout <<"x: " << robotPosCur.x() << ", y:  " << robotPosCur.y() << ",z : " << robotPosCur.z() << endl;
     }
