@@ -431,6 +431,13 @@ Vec3 projectPointToLine(const Vec3& P, const Vec3& A, const Vec3& B) {
     return A + t * AB;
 }
 
+// Projection orthogonale d’un vecteur sur la droite AB
+Vec3 projectVectorToLine(const Vec3& vector, const Vec3& A, const Vec3& B) {
+    Vec3 AB = B - A;
+    Vec3 projected_vector = (vector.dot(AB) / AB.dot(AB))*AB;  // projection scalaire
+    return projected_vector;
+}
+
 // Distance signée perpendiculaire à la droite
 double distanceToLine(const Vec3& P, const Vec3& A, const Vec3& B) {
     Vec3 proj = projectPointToLine(P, A, B);
@@ -1775,7 +1782,7 @@ void updateRobotDevice(void)
 
 
         //// compute spring force to move robot toward desired position (robotPosDes) 
-        double Kp = 5500;
+        double Kp = 5000;
         double Kv = 25;
         cVector3d force = Kp * (robotPosDes - robotPosCur) - Kv * robotVelCur;
 
@@ -2265,6 +2272,11 @@ void updateHapticDevice(void)
             {
                 // compute new desired robot position based on new haptic device position and axis locking conditions
                 if (!(lock_x || lock_y || lock_z)) {
+
+                    /*if (haptic_state != LINEAR_EXPLORATION) {
+                        robotPosDes = robotPosDes0 + scaleFactor * (hapticPos - hapticPos0);
+                    }*/
+
                     robotPosDes = robotPosDes0 + scaleFactor * (hapticPos - hapticPos0);
                 }
                 else {
@@ -2454,14 +2466,13 @@ void updateHapticDevice(void)
      //                   virtualRobotPos = lastVirtualRobotPos + scaleFactor * (hapticPos - hapticPos0);
      //               }
 
-                   /* virtualRobotPos = robotPos_HapticFrame + scaleFactor * (hapticPos - hapticPos0);*/
+                   virtualRobotPos = robotPos + scaleFactor * (hapticPos - hapticPos0);
 
+                   double correction_factor = 0.5;
+
+				   // -------------------- Correction of the virtual robot position to match the real one ------------------- //
+				   virtualRobotPos += correction_factor * (robotPos - virtualRobotPos);
                  
-
-                    
-
-
-                    virtualRobotPos = robotPos + scaleFactor * (hapticPos - hapticPos0);
 
                     // ------------------- CONVERSION EN VEC3 POUR UTILISER LES FONCTIONS DE EIGEN ---------------- //
                     Vec3 virtualRobotPos_Vec3(virtualRobotPos.x(), virtualRobotPos.y(), virtualRobotPos.z());
@@ -2508,6 +2519,21 @@ void updateHapticDevice(void)
                     // Conversion vers CHAI3D
                     cVector3d F_line_haptic(F_perp[0], F_perp[1], F_perp[2]);
                     force += F_line_haptic;
+
+					// ------ Compute desired robot position (project the movement of the haptic device to the line AB) ------ //
+
+					/*cVector3d hapticMovement = hapticPos - hapticPos0; 
+					Vec3 hapticMovement_Vec3(hapticMovement.x(), hapticMovement.y(), hapticMovement.z());
+
+					Vec3 projectedHapticMovement_Vec3 = projectVectorToLine(hapticMovement_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3);
+
+					cVector3d projectedHapticMovement(projectedHapticMovement_Vec3[0], projectedHapticMovement_Vec3[1], projectedHapticMovement_Vec3[2]);
+
+					robotPosDes = robotPosDes0 + scaleFactor * projectedHapticMovement;*/
+
+					// ----------------------------------------------------------------------------------------------------- //
+
+
 
                     //log_counter++;
 
