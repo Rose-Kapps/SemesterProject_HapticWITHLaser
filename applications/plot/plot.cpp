@@ -102,6 +102,13 @@ int log_counter = 0;
 
 cVector3d lastVirtualRobotPos(0,0,0);
 
+Vec3 lastHapticPosOnLine(0, 0, 0);
+
+Vec3 hapticPosOnLine(0, 0, 0);
+
+Vec3 A_HapticFrame_Vec3(0, 0, 0);
+Vec3 B_HapticFrame_Vec3(0, 0, 0);
+
 cVector3d robotPosShared(0, 0, 0);
 
 // a flag to indicate if the simulation currently running
@@ -2265,6 +2272,7 @@ void updateHapticDevice(void)
             {
                 // user has released button, go into idle mode
 				lastVirtualRobotPos = virtualRobotPos;
+                lastHapticPosOnLine = hapticPosOnLine;
                /* cout << "lastVirtualRobotPos = " << lastVirtualRobotPos << endl;*/
                 state = STATE_IDLE;
             }
@@ -2273,11 +2281,11 @@ void updateHapticDevice(void)
                 // compute new desired robot position based on new haptic device position and axis locking conditions
                 if (!(lock_x || lock_y || lock_z)) {
 
-                    /*if (haptic_state != LINEAR_EXPLORATION) {
+                    if (haptic_state != LINEAR_EXPLORATION) {
                         robotPosDes = robotPosDes0 + scaleFactor * (hapticPos - hapticPos0);
-                    }*/
+                    }
 
-                    robotPosDes = robotPosDes0 + scaleFactor * (hapticPos - hapticPos0);
+                    /*robotPosDes = robotPosDes0 + scaleFactor * (hapticPos - hapticPos0);*/
                 }
                 else {
                     if (lock_x && lock_y && lock_z) {
@@ -2389,7 +2397,7 @@ void updateHapticDevice(void)
                     // -----------------------------------------------------------------------------------------------------------------------
 
                     // Store the points that corresponds to an interface point --> Take the position of the manipulating robot
-                    if (voltageLevel > 0.65) { //max value to adapt
+                    if (voltageLevel > 1) { //max value to adapt
 
                         Vec3 interface_point = { robotPos.x(),robotPos.y(),robotPos.z() };  // A CHANGER AVEC LE BUFFER!!!!!
                         
@@ -2440,18 +2448,15 @@ void updateHapticDevice(void)
 
                     planar_exploration = 1;
 
+                    Vec3 hapticPos_Vec3(hapticPos.x(), hapticPos.y(), hapticPos.z());
+                   
                     // ----- Transformation de tout ce dont on a besoin dans le repère du haptic device ---- //
 
                     /*cVector3d robotPos_HapticFrame = robotRot * robotPos;*/
 
-                    cVector3d A_HapticFrame = robotRot * cVector3d(list_of_interface_points[0][0], list_of_interface_points[0][1], list_of_interface_points[0][2]);
-                    cVector3d B_HapticFrame = robotRot * cVector3d(list_of_interface_points[1][0], list_of_interface_points[1][1], list_of_interface_points[1][2]);
+                    
 
-                    // ------------------- CONVERSION EN VEC3 POUR UTILISER LES FONCTIONS DE EIGEN ---------------- //
-
-                    Vec3 A_HapticFrame_Vec3(A_HapticFrame.x(), A_HapticFrame.y(), A_HapticFrame.z());
-                    Vec3 B_HapticFrame_Vec3(B_HapticFrame.x(), B_HapticFrame.y(), B_HapticFrame.z());
-
+                    
                     /*Vec3 robotPos0_Vec3(robotPos0.x(), robotPos0.y(), robotPos0.z());*/
 
                     // ------------------- Compute virtual position of the manipulating robot in the haptic frame ---------------- //
@@ -2466,34 +2471,58 @@ void updateHapticDevice(void)
      //                   virtualRobotPos = lastVirtualRobotPos + scaleFactor * (hapticPos - hapticPos0);
      //               }
 
-                   virtualRobotPos = robotPos + scaleFactor * (hapticPos - hapticPos0);
+       //            virtualRobotPos = robotPos + scaleFactor * (hapticPos - hapticPos0);
 
-                   double correction_factor = 0.5;
+       //            double correction_factor = 0.5;
 
-				   // -------------------- Correction of the virtual robot position to match the real one ------------------- //
-				   virtualRobotPos += correction_factor * (robotPos - virtualRobotPos);
-                 
+				   //// -------------------- Correction of the virtual robot position to match the real one ------------------- //
+				   //virtualRobotPos += correction_factor * (robotPos - virtualRobotPos);
+       //          
+
+       //             // ------------------- CONVERSION EN VEC3 POUR UTILISER LES FONCTIONS DE EIGEN ---------------- //
+       //             Vec3 virtualRobotPos_Vec3(virtualRobotPos.x(), virtualRobotPos.y(), virtualRobotPos.z());
+
+                    if (lastHapticPosOnLine[0] == 0 && lastHapticPosOnLine[1] == 0 && lastHapticPosOnLine[2] == 0  ) {
+
+                        A_HapticFrame_Vec3 << list_of_interface_points[0][0], list_of_interface_points[0][1], list_of_interface_points[0][2];
+                        B_HapticFrame_Vec3 << list_of_interface_points[1][0], list_of_interface_points[1][1], list_of_interface_points[1][2];
+                    }
+
+                    else {
+                        Vec3 delta = hapticPos_Vec3 - lastHapticPosOnLine;
+                        A_HapticFrame_Vec3 += delta;
+                        B_HapticFrame_Vec3 += delta;
+
+                    }
 
                     // ------------------- CONVERSION EN VEC3 POUR UTILISER LES FONCTIONS DE EIGEN ---------------- //
-                    Vec3 virtualRobotPos_Vec3(virtualRobotPos.x(), virtualRobotPos.y(), virtualRobotPos.z());
+
+                   /* Vec3 A_HapticFrame_Vec3(A_HapticFrame.x(), A_HapticFrame.y(), A_HapticFrame.z());
+                    Vec3 B_HapticFrame_Vec3(B_HapticFrame.x(), B_HapticFrame.y(), B_HapticFrame.z());*/
+
+
+                    hapticPosOnLine = projectPointToLine(hapticPos_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3);
                    
 
                    /* cout << "vitrualRobtoPos_Vec3" << virtualRobotPos_Vec3 << endl;*/
 
 					// Compute haptic force to follow the line defined by points A and B
-                    double dist_perp = distanceToLine(virtualRobotPos_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3);
-                    Vec3 dir_perp = perpendicularDirectionToLine(virtualRobotPos_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3);
+                    double dist_perp = distanceToLine(hapticPos_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3);
+                    Vec3 dir_perp = perpendicularDirectionToLine(hapticPos_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3);
                     
 
-                    double t = computeT(virtualRobotPos_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3); // just for plotting
+                    double t = computeT(hapticPos_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3); // just for plotting
 
 					// Direction vector of the line AB
                     Vec3 AB = B_HapticFrame_Vec3 - A_HapticFrame_Vec3;
                     Vec3 uAB = AB.normalized();
 
                     // Stiffness & damping
-                    double K_line = 700000;
-                    double B_line = 100;
+                    /*double K_line = 1000000;
+                    double B_line = 100;*/
+
+                    double K_line = 10;
+                    double B_line = 1;
 
                     // Vitesse perpendiculaire : projeter la vitesse sur la direction perpendiculaire
                     Vec3 V(hapticVel.x(), hapticVel.y(), hapticVel.z());
@@ -2522,18 +2551,19 @@ void updateHapticDevice(void)
 
 					// ------ Compute desired robot position (project the movement of the haptic device to the line AB) ------ //
 
-					/*cVector3d hapticMovement = hapticPos - hapticPos0; 
+					cVector3d hapticMovement = hapticPos - hapticPos0; 
 					Vec3 hapticMovement_Vec3(hapticMovement.x(), hapticMovement.y(), hapticMovement.z());
 
 					Vec3 projectedHapticMovement_Vec3 = projectVectorToLine(hapticMovement_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3);
 
 					cVector3d projectedHapticMovement(projectedHapticMovement_Vec3[0], projectedHapticMovement_Vec3[1], projectedHapticMovement_Vec3[2]);
 
-					robotPosDes = robotPosDes0 + scaleFactor * projectedHapticMovement;*/
+					robotPosDes = robotPosDes0 + scaleFactor * projectedHapticMovement;
 
 					// ----------------------------------------------------------------------------------------------------- //
+                    
 
-
+                   
 
                     //log_counter++;
 
@@ -2555,12 +2585,12 @@ void updateHapticDevice(void)
                             << directionAlongSegment << ","
                             << dist_perp << ","
                             /*<< dir_perp << ","*/    // ATTENTION --> IL FAUT DIFFERENCIER X Y ET Z SINON BUG DANS LE CSV
-                            << A_HapticFrame.x() << ","
-                            << A_HapticFrame.y() << ","
-                            << A_HapticFrame.z() << ","
-                            << B_HapticFrame.x() << ","
-                            << B_HapticFrame.y() << ","
-                            << B_HapticFrame.z() << ","
+                            << A_HapticFrame_Vec3[0] << ","
+                            << A_HapticFrame_Vec3[1] << ","
+                            << A_HapticFrame_Vec3[2] << ","
+                            << B_HapticFrame_Vec3[0] << ","
+                            << B_HapticFrame_Vec3[1] << ","
+                            << B_HapticFrame_Vec3[2] << ","
                             << virtualRobotPos.x() << ","
                             << virtualRobotPos.y() << ","
                             << virtualRobotPos.z() << ","
