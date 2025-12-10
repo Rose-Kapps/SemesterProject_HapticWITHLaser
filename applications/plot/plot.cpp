@@ -1786,6 +1786,7 @@ void updateRobotDevice(void)
         double Kv = 25;
         cVector3d force = Kp * (robotPosDes - robotPosCur) - Kv * robotVelCur;
 
+
         auto_scan();
         // release mutex
         mutexDevices.release();
