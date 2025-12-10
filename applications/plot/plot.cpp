@@ -2698,6 +2698,11 @@ void updateHapticDevice(void)
                     cVector3d F_line_haptic(F_perp[0], F_perp[1], F_perp[2]);
                     force += F_line_haptic;
 
+                    if (boundingPoints == false) {
+                        cout << "Out of bounds: t = " << t_robot << " (points A and B at t=0 and t=1)" << endl;
+						force = cVector3d(0, 0, 0);
+					}
+
 					// ------ Compute desired robot position (project the movement of the haptic device to the line AB) ------ //
 
 					/*cVector3d hapticMovement = hapticPos - hapticPos0; 
