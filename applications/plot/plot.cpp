@@ -86,7 +86,7 @@ Vec3 PointA;
 Vec3 PointB;
 
 double lastTHG = 0.0;
-double zScanSpeed = 0.00002;      // 20 µm/s
+double zScanSpeed = 0.00002;      // 2 µm/s
 double hysteresis = 0.02;         // anti bruits
 int zDirection = +1;              // commence vers +Z
 double minStepSize = 0.000001;    // 1 µm
@@ -427,9 +427,23 @@ bool getBoundingPoints(double t_robot,
     return false; // ne devrait jamais arriver
 }
 
-void addInterfacePoint(const cVector3d& newPos, double tNew)
-{
+
+
+bool addInterfacePointIfFarEnough(const cVector3d& newPos, double tNew, double minDistance)
+{   
 	Vec3 newPos_Vec3(newPos.x(), newPos.y(), newPos.z());
+
+    // 1. Vérifier la proximité
+    for (const auto& p : list_of_interface_points)
+    {
+        if ((p.pos - newPos_Vec3).norm() < minDistance)
+        {
+            // Trop proche → on NE l'ajoute PAS
+            return false;
+        }
+    }
+
+
     InterfacePoint newPoint;
     newPoint.pos = newPos_Vec3;
     newPoint.t = tNew;
@@ -1699,8 +1713,8 @@ void updateRobotDevice(void)
     // get time point 0
     chrono::high_resolution_clock::time_point timePoint0 = chrono::high_resolution_clock::now();
 
-    //string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\RobotData\\";
-    string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\3DData\\";
+    string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\RobotData\\";
+    /*string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\3DData\\";*/
     string folder_XScan = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\X-Scan\\";
 
     
@@ -1728,7 +1742,7 @@ void updateRobotDevice(void)
     static ofstream csvFile(filename, ios::app);
     if (fileIsEmpty) {
         // write header only if file is empty
-        csvFile << "x [m],y [m],z [m],Voltage [V]" << endl;
+        csvFile << "x [m],y [m],z [m],Voltage [V],dz,robotPosDes_x,robotPosDes_y,robotPosDes_z,timestamps" << endl;
     }
 
     // Deuxieme fichier csv ////////////////////
@@ -1879,6 +1893,19 @@ void updateRobotDevice(void)
         double Kv = 25;
         cVector3d force = Kp * (robotPosDes - robotPosCur) - Kv * robotVelCur;
 
+        // Test vitesse de scan
+
+        //double THG = voltageLevel;
+        //auto now = chrono::steady_clock::now();
+        //double dt = chrono::duration<double>(now - lastScanUpdate).count();
+        //lastScanUpdate = now;
+
+        //// 1) Déplacement lent du robot
+        //double dz = zDirection * zScanSpeed * dt;
+
+        //robotPosDes.z(robotPosDes.z() + dz);
+        
+
         // =======================================================
         //                 AUTO Z-SCAN ALGORITHM
         // =======================================================
@@ -1887,12 +1914,15 @@ void updateRobotDevice(void)
         auto now = chrono::steady_clock::now();
         double dt = chrono::duration<double>(now - lastScanUpdate).count();
         lastScanUpdate = now;
+        double dz = 0;
+
+        double THG_threshold = 0.7;
 
         // ----- ÉTAT INACTIF -----
         if (robot_state == Z_IDLE) {
 
             // On lance le Z-scan dès qu’on détecte du THG
-            if (THG > threshold) {
+            if ( (haptic_state == LINEAR_EXPLORATION) && (THG < THG_threshold) ) {  //si on est au max, on ne bouge pas
                 robot_state = Z_INIT;
                 lastTHG = THG;
             }
@@ -1906,41 +1936,82 @@ void updateRobotDevice(void)
             lastTHG = THG;
 
             robot_state = Z_MOVING;
+
         }
 
         // ----- MOUVEMENT EN Z -----
         else if (robot_state == Z_MOVING) {
 
             // 1) Déplacement lent du robot
-            double dz = zDirection * zScanSpeed * dt;
-            if (fabs(dz) < minStepSize) dz = zDirection * minStepSize;
+            dz = zDirection * zScanSpeed * dt;
+            /*if (fabs(dz) < minStepSize) dz = zDirection * minStepSize;*/
 
             robotPosDes.z(robotPosDes.z() + dz);
 
             // 2) Analyse du signal
-            if (THG > lastTHG + hysteresis) {
+            if (THG > 0.7) {  // si on est au dessus du threshold on considère qu'on est au max
+                cout << "max signal" << endl;
+
+                Vec3 robotPosCur_Vec3(robotPosCur.x(), robotPosCur.y(), robotPosCur.z());
+
+                double t = computeT(robotPosCur_Vec3, PointA, PointB);
+                double minDist = 0.0001;  // 100 microns
+
+                addInterfacePointIfFarEnough(robotPosCur, t, minDist);
+
+                robot_state = Z_IDLE;
+            }
+
+            else if (THG > lastTHG + hysteresis) {
                 // --- Signal augmente : bon sens ---
                 // Ajouter point d’interface pour recalculer la ligne
 
-				Vec3 robotPosCur_Vec3(robotPosCur.x(), robotPosCur.y(), robotPosCur.z());
-
-				double t = computeT(robotPosCur_Vec3, PointA, PointB);
-
-				addInterfacePoint(robotPosCur, t);
+                
             }
             else if (THG < lastTHG - hysteresis) {
                 // --- Mauvais sens : inverser ---
                 zDirection *= -1;
             }
-            else {
-                // Si presque aucune variation → maximum atteint
-                if (fabs(THG - lastTHG) < hysteresis * 0.5) {
-                    robot_state = Z_IDLE;
-                }
-            }
+
+
 
             lastTHG = THG;
         }
+
+        // ----- MOUVEMENT EN Z -----
+    //    else if (robot_state == Z_MOVING) {
+
+    //        // 1) Déplacement lent du robot
+    //        dz = zDirection * zScanSpeed * dt;
+    //        /*if (fabs(dz) < minStepSize) dz = zDirection * minStepSize;*/
+
+    //        robotPosDes.z(robotPosDes.z() + dz);
+
+    //        // 2) Analyse du signal
+    //        if (THG > 0.7) {  // si on est au dessus du threshold on considère qu'on est au max
+    //            cout << "max signal" << endl;
+    //            robot_state = Z_IDLE;
+    //        }
+
+    //        else if (THG > lastTHG + hysteresis) {
+    //            // --- Signal augmente : bon sens ---
+    //            // Ajouter point d’interface pour recalculer la ligne
+
+				//Vec3 robotPosCur_Vec3(robotPosCur.x(), robotPosCur.y(), robotPosCur.z());
+
+				//double t = computeT(robotPosCur_Vec3, PointA, PointB);
+
+				//addInterfacePoint(robotPosCur, t);
+    //        }
+    //        else if (THG < lastTHG - hysteresis) {
+    //            // --- Mauvais sens : inverser ---
+    //            zDirection *= -1;
+    //        }
+    //        
+    //        
+
+    //        lastTHG = THG;
+    //    }
 
         auto_scan();
         // release mutex
@@ -1953,17 +2024,37 @@ void updateRobotDevice(void)
 
         add_value();
 
-        
+        auto now_time_plot = chrono::steady_clock::now();
+        long long timestamp_ms_plot = chrono::duration_cast<chrono::milliseconds>(now_time_plot.time_since_epoch()).count();
 
-        if (Voltage_Copy > threshold)
-        {
-            csvFile << RobotPos_Copy.x() << ","
-                << RobotPos_Copy.y() << ","
-                << RobotPos_Copy.z() << ","
-                << Voltage_Copy << endl;
+        csvFile << RobotPos_Copy.x() << ","
+            << RobotPos_Copy.y() << ","
+            << RobotPos_Copy.z() << ","
+            << Voltage_Copy << ","
+            << dz << ","
+            << robotPosDes.x() << ","
+            << robotPosDes.y() << ","
+            << robotPosDes.z() << ","
+            << timestamp_ms_plot
+            << endl;
 
-            csvFile.flush(); // guarantee data is written to file immediately
-        }
+        csvFile.flush();
+
+        //if (Voltage_Copy > threshold)
+        //{
+        //    csvFile << RobotPos_Copy.x() << ","
+        //        << RobotPos_Copy.y() << ","
+        //        << RobotPos_Copy.z() << ","
+        //        << Voltage_Copy << ","
+        //        << dz << ","
+        //        << robotPosDes.x() << ","
+        //        << robotPosDes.y() << ","
+        //        << robotPosDes.z() << ","
+        //        << timestamp_ms_plot 
+        //        << endl;
+
+        //    csvFile.flush(); // guarantee data is written to file immediately
+        //}
 
         /*auto now_time = chrono::steady_clock::now();
         long long timestamp_ms = chrono::duration_cast<chrono::milliseconds>(now_time.time_since_epoch()).count();
@@ -2326,7 +2417,7 @@ void updateHapticDevice(void)
             //csvFile.flush();
 
             // check if user has pressed the button
-            if (userButton == true)
+            if (userButton == true && robot_state != Z_MOVING)
             {
                 // reset clutching positions for robot device and haptic device
                 robotPosDes0 = robotPosDes;
@@ -2414,7 +2505,7 @@ void updateHapticDevice(void)
         //
         // STATE TELEOPERATION
         //
-        if (state == STATE_TELEOPERATION)
+        if (state == STATE_TELEOPERATION )
         {
 
             if (userButton == false)
@@ -2424,7 +2515,7 @@ void updateHapticDevice(void)
                /* cout << "lastVirtualRobotPos = " << lastVirtualRobotPos << endl;*/
                 state = STATE_IDLE;
             }
-            else
+            else if (robot_state != Z_MOVING)
             {
                 // compute new desired robot position based on new haptic device position and axis locking conditions
                 if (!(lock_x || lock_y || lock_z)) {
@@ -2545,7 +2636,7 @@ void updateHapticDevice(void)
                     // -----------------------------------------------------------------------------------------------------------------------
 
                     // Store the points that corresponds to an interface point --> Take the position of the manipulating robot
-                    if (voltageLevel > 0.65) { //max value to adapt
+                    if (voltageLevel > 0.7) { //max value to adapt
 
                         Vec3 interface_point = { robotPos.x(),robotPos.y(),robotPos.z() };  // A CHANGER AVEC LE BUFFER!!!!!
                         
@@ -2601,10 +2692,12 @@ void updateHapticDevice(void)
 
                 else if (haptic_state == LINEAR_EXPLORATION) {
 
+                    scaleFactor = 0.001;
+
                     interface_point_taken = 0;
 
                     if (planar_exploration == 0) {
-                        cout << "Beginning of planar exploration" << endl;
+                        cout << "Beginning of linear exploration" << endl;
                     }
 
                     planar_exploration = 1;
@@ -2699,7 +2792,7 @@ void updateHapticDevice(void)
                     force += F_line_haptic;
 
                     if (boundingPoints == false) {
-                        cout << "Out of bounds: t = " << t_robot << " (points A and B at t=0 and t=1)" << endl;
+                        /*cout << "Out of bounds: t = " << t_robot << " (points A and B at t=0 and t=1)" << endl;*/
 						force = cVector3d(0, 0, 0);
 					}
 
