@@ -1887,7 +1887,7 @@ void updateHapticDevice(void)
     string folderPlane = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\PlaneForces\\";
 	string folderTHGLineScanning = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\THGLineScanningV2\\";
     string folderTHGAutoScan = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\THGAutoScan\\";
-    string folderZScan = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\Z-Scan\\";
+    string folderZScan = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\X-Scan_sandblastedSample\\";
 
 
     // Création du nom de fichier avec timestamp
@@ -2025,10 +2025,29 @@ void updateHapticDevice(void)
             << endl;
     }
 
+    ////Nom du cinquième fichier csv
+    //ostringstream ossZScan;
+    //ossZScan << folderZScan
+    //    << "leica_objective_testSample"
+    //    << put_time(now, "%Y-%m-%d_%H-%M-%S")
+    //    << ".csv";
+
+    //const string filename_ZScan = ossZScan.str();
+
+    //bool fileIsEmpty_ZScan = !fs::exists(filename_ZScan) || fs::file_size(filename_ZScan) == 0;
+
+    //static ofstream csvFile_ZScan(filename_ZScan, ios::app);
+    //if (fileIsEmpty_ZScan) {
+    //    csvFile_ZScan 
+    //        << "voltageLevel[V],"
+    //        << "robotPos_z[m]"
+    //        << endl;
+    //}
+
     //Nom du cinquième fichier csv
     ostringstream ossZScan;
     ossZScan << folderZScan
-        << "leica_objective_TESTBRUIT"
+        << "sandblastedSample"
         << put_time(now, "%Y-%m-%d_%H-%M-%S")
         << ".csv";
 
@@ -2036,13 +2055,22 @@ void updateHapticDevice(void)
 
     bool fileIsEmpty_ZScan = !fs::exists(filename_ZScan) || fs::file_size(filename_ZScan) == 0;
 
-    static ofstream csvFile_ZScan(filename_ZScan, ios::app);
+    /*static ofstream csvFile_ZScan(filename_ZScan, ios::app);
     if (fileIsEmpty_ZScan) {
-        csvFile_ZScan 
+        csvFile_ZScan
             << "voltageLevel[V],"
             << "robotPos_z[m]"
             << endl;
+    }*/
+
+    static ofstream csvFile_ZScan(filename_ZScan, ios::app);
+    if (fileIsEmpty_ZScan) {
+        csvFile_ZScan
+            << "voltageLevel[V],"
+            << "robotPos_x[m]"
+            << endl;
     }
+
 
 
     //cVector3d Fz_stiff(0.0, 0.0, 0.0);  /////////////////////////////////////////////////
@@ -2258,13 +2286,21 @@ void updateHapticDevice(void)
 					<< endl;
 			}
 
-            /*if (scan_z == true) {
+           /* if (scan_z == true) {
                 csvFile_ZScan
                     << voltageLevel << ","
                     << robotPos.z()
                     << endl;
 
             }*/
+
+            if (scan_x == true) {
+                csvFile_ZScan
+                    << voltageLevel << ","
+                    << robotPos.x()
+                    << endl;
+
+            }
 
 
         }
@@ -2403,7 +2439,7 @@ void updateHapticDevice(void)
                     // -----------------------------------------------------------------------------------------------------------------------
 
                     // Store the points that corresponds to an interface point --> Take the position of the manipulating robot
-                    if (voltageLevel > 0.7) { //max value to adapt
+                    if (voltageLevel > 0.6) { //max value to adapt
 
                         Vec3 interface_point = { robotPos.x(),robotPos.y(),robotPos.z() };  // A CHANGER AVEC LE BUFFER!!!!!
                         
@@ -2778,9 +2814,9 @@ void auto_scan(void) {
  
         }
         i++;
-        if (scan_x) scan_vector.set(1 * microns, 0, 0);
-        else if (scan_y) scan_vector.set(-1 * microns, 0, 0);
-        else if (scan_z) scan_vector.set(0, 0, 0.01 * microns);  // ---------------- ATTENTION J'AI TRANSFORMÉ SCAN Y EN SCAN -X --------------------------- //
+        if (scan_x) scan_vector.set(0.1 * microns, 0, 0);
+        else if (scan_y) scan_vector.set(-0.1 * microns, 0, 0);
+        else if (scan_z) scan_vector.set(0, 0, 0.1 * microns);  // ---------------- ATTENTION J'AI TRANSFORMÉ SCAN Y EN SCAN -X --------------------------- //
         robotPosDes = robotPosDes + scan_vector;
         //cout <<"x: " << robotPosCur.x() << ", y:  " << robotPosCur.y() << ",z : " << robotPosCur.z() << endl;
     }
