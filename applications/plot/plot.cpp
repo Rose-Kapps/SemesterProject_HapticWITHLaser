@@ -707,7 +707,7 @@ int main(int argc, char* argv[])
     robotRot.identity();
 
     // rotate the robot device base to the desired angle
-    robotRot.rotateAboutGlobalAxisDeg(0, 0, 1, 180);
+   /* robotRot.rotateAboutGlobalAxisDeg(0, 0, 1, 180);*/
 
     //--------------------------------------------------------------------------
     // DETECT ROBOT AND HAPTIC DEVICES
@@ -1636,8 +1636,8 @@ void updateRobotDevice(void)
 
 
         //// compute spring force to move robot toward desired position (robotPosDes) 
-        double Kp = 2000;
-        double Kv = 10;
+        double Kp = 5000;
+        double Kv = 25;
         cVector3d force = Kp * (robotPosDes - robotPosCur) - Kv * robotVelCur;
 
         auto_scan();
@@ -1651,7 +1651,7 @@ void updateRobotDevice(void)
 
         add_value();
 
-        if (Voltage_Copy > threshold)
+        if (haptic_state == PLANAR_EXPLORATION)
         {
             csvFile << RobotPos_Copy.x() << ","
                 << RobotPos_Copy.y() << ","
@@ -1838,7 +1838,7 @@ void updateHapticDevice(void)
             max_voltage = 0.3;
         }
         else if (scaleFactor == 0.001) {
-            max_voltage = 1.8;
+            max_voltage = 0.9;
         }
         // normalized value multiplied by three for amplification 
         /*double THGsignal = cClamp((voltageSmoothed - min_voltage) / (max_voltage - min_voltage), 0.0, 1.0);*/
@@ -2069,7 +2069,7 @@ void updateHapticDevice(void)
                     // -----------------------------------------------------------------------------------------------------------------------
 
                     // Store the points that corresponds to an interface point --> Take the position of the manipulating robot
-                    if (voltageLevel > 1.7) { //max value to adapt
+                    if (voltageLevel > 0.7) { //max value to adapt
 
                         Vec3 interface_point = { robotPos.x(),robotPos.y(),robotPos.z() };
                         
@@ -2110,6 +2110,8 @@ void updateHapticDevice(void)
 
                 else if (haptic_state == PLANAR_EXPLORATION) {
 
+                    scaleFactor = 0.001;
+
                     interface_point_taken = 0;
 
                     if (planar_exploration == 0) {
@@ -2133,6 +2135,11 @@ void updateHapticDevice(void)
 					// ------------------- Compute virtual position of the manipulating robot in the haptic frame ---------------- //
 
 					cVector3d virtualRobotPos = robotRot * robotPos0 + scaleFactor * (hapticPos - hapticPos0);
+
+                    //double correction_factor = 0.5;
+
+                    //// -------------------- Correction of the virtual robot position to match the real one ------------------- //
+                    //virtualRobotPos += correction_factor * (robotPos - virtualRobotPos);
                     
                     // ------------------- CONVERSION EN VEC3 POUR UTILISER LES FONCTIONS DE EIGEN ---------------- //
 
