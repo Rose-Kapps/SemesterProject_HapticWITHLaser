@@ -87,7 +87,7 @@ Vec3 PointB;
 
 double lastTHG = 0.0;
 double zScanSpeed = 0.00002;      // 2 µm/s
-double hysteresis = 0.02;         // anti bruits
+double hysteresis = 0.025;         // anti bruits
 int zDirection = +1;              // commence vers +Z
 double minStepSize = 0.000001;    // 1 µm
 chrono::steady_clock::time_point lastScanUpdate = chrono::steady_clock::now();
@@ -391,7 +391,9 @@ cVector3d signalDiff(0, 0, 0);
 
 bool getBoundingPoints(double t_robot,
     Vec3& lower,
-    Vec3& upper)
+    Vec3& upper,
+    Vec3 PointA,
+    Vec3 PointB)
 {
     int N = list_of_interface_points.size();
     if (N < 2) return false;
@@ -427,7 +429,29 @@ bool getBoundingPoints(double t_robot,
     return false; // ne devrait jamais arriver
 }
 
-
+//void addInterfacePoint(const Vec3& newPos, double tNew)
+//{  
+//    InterfacePoint newPoint;
+//    newPoint.pos = newPos;
+//    newPoint.t = tNew;
+//
+//    // Si le vecteur est vide, on ajoute directement
+//    if (list_of_interface_points.empty()) {
+//        list_of_interface_points.push_back(newPoint);
+//        return;
+//    }
+//
+//    // Chercher la première position avec t > tNew
+//    auto it = std::upper_bound(
+//        list_of_interface_points.begin(),
+//        list_of_interface_points.end(),
+//        tNew,
+//        [](double tValue, const InterfacePoint& p) { return tValue < p.t; }
+//    );
+//
+//    // Insérer à la position trouvée
+//    list_of_interface_points.insert(it, newPoint);
+//}
 
 bool addInterfacePointIfFarEnough(const cVector3d& newPos, double tNew, double minDistance)
 {   
@@ -448,11 +472,13 @@ bool addInterfacePointIfFarEnough(const cVector3d& newPos, double tNew, double m
     newPoint.pos = newPos_Vec3;
     newPoint.t = tNew;
 
-    // Si le vecteur est vide, on ajoute directement
-    if (list_of_interface_points.empty()) {
-        list_of_interface_points.push_back(newPoint);
-        return;
-    }
+    cout << "new point added: pos = " << newPoint.pos.transpose() << ", t = " << newPoint.t << endl;
+
+    //// Si le vecteur est vide, on ajoute directement
+    //if (list_of_interface_points.empty()) {
+    //    list_of_interface_points.push_back(newPoint);
+    //    return true;
+    //}
 
     // Chercher la première position avec t > tNew
     auto it = std::upper_bound(
@@ -464,6 +490,9 @@ bool addInterfacePointIfFarEnough(const cVector3d& newPos, double tNew, double m
 
     // Insérer à la position trouvée
     list_of_interface_points.insert(it, newPoint);
+
+    return true;
+
 }
 
 
@@ -1742,7 +1771,7 @@ void updateRobotDevice(void)
     static ofstream csvFile(filename, ios::app);
     if (fileIsEmpty) {
         // write header only if file is empty
-        csvFile << "x [m],y [m],z [m],Voltage [V],dz,robotPosDes_x,robotPosDes_y,robotPosDes_z,timestamps" << endl;
+        csvFile << "x [m],y [m],z [m],Voltage [V],dz,robotPosDes_x,robotPosDes_y,robotPosDes_z,timestamps,pointA_x,pointA_y,pointA_z,pointB_x,pointB_y,pointB_z" << endl;
     }
 
     // Deuxieme fichier csv ////////////////////
@@ -1969,6 +1998,7 @@ void updateRobotDevice(void)
                 
             }
             else if (THG < lastTHG - hysteresis) {
+                cout << "changing direction" << endl;
                 // --- Mauvais sens : inverser ---
                 zDirection *= -1;
             }
@@ -2024,21 +2054,29 @@ void updateRobotDevice(void)
 
         add_value();
 
-        auto now_time_plot = chrono::steady_clock::now();
-        long long timestamp_ms_plot = chrono::duration_cast<chrono::milliseconds>(now_time_plot.time_since_epoch()).count();
+        if (haptic_state == LINEAR_EXPLORATION) {
+            auto now_time_plot = chrono::steady_clock::now();
+            long long timestamp_ms_plot = chrono::duration_cast<chrono::milliseconds>(now_time_plot.time_since_epoch()).count();
 
-        csvFile << RobotPos_Copy.x() << ","
-            << RobotPos_Copy.y() << ","
-            << RobotPos_Copy.z() << ","
-            << Voltage_Copy << ","
-            << dz << ","
-            << robotPosDes.x() << ","
-            << robotPosDes.y() << ","
-            << robotPosDes.z() << ","
-            << timestamp_ms_plot
-            << endl;
+            csvFile << RobotPos_Copy.x() << ","
+                << RobotPos_Copy.y() << ","
+                << RobotPos_Copy.z() << ","
+                << Voltage_Copy << ","
+                << dz << ","
+                << robotPosDes.x() << ","
+                << robotPosDes.y() << ","
+                << robotPosDes.z() << ","
+                << timestamp_ms_plot << ","
+                << PointA[0] << ","
+                << PointA[1] << ","
+                << PointA[2] << ","
+                << PointB[0] << ","
+                << PointB[1] << ","
+                << PointB[2] 
+                << endl;
 
-        csvFile.flush();
+            csvFile.flush();
+        }
 
         //if (Voltage_Copy > threshold)
         //{
@@ -2644,10 +2682,24 @@ void updateHapticDevice(void)
 
                         if (PointA[0] == 0 && PointA[1] == 0 && PointA[2] == 0) {
                             PointA = interface_point;
+
+                            // Ajouter le point à la liste des points d'interface
+                            InterfacePoint newPoint;
+                            newPoint.pos = PointA;
+                            newPoint.t = 0;
+                            list_of_interface_points.push_back(newPoint);
+
 							cout << "Initial Point A set to ( " << PointA[0] << ", " << PointA[1] << ", " << PointA[2] << " )" << endl;
                         }
-                        else if ( (PointA - interface_point).norm() >minDistance) {
+                        else if ( (PointA - interface_point).norm() > minDistance) {
                             PointB = interface_point;
+
+                            // Ajouter le point à la liste des points d'interface
+                            InterfacePoint newPoint;
+                            newPoint.pos = PointB;
+                            newPoint.t = 1;
+                            list_of_interface_points.push_back(newPoint);
+
 							cout << "Initial Point B set to ( " << PointB[0] << ", " << PointB[1] << ", " << PointB[2] << " )" << endl;
                             haptic_state = LINEAR_EXPLORATION;
 							cout << "Switch to next state: LINEAR EXPLORATION" << endl;
@@ -2709,7 +2761,9 @@ void updateHapticDevice(void)
                     Vec3 P1(0,0,0);
                     Vec3 P2(0,0,0);
 
-                    bool boundingPoints = getBoundingPoints(t_robot, P1, P2);
+                    bool boundingPoints = getBoundingPoints(t_robot, P1, P2, PointA, PointB);
+
+                    
 
                     // ----- Transformation de tout ce dont on a besoin dans le repère du haptic device ---- //
 
@@ -2792,9 +2846,11 @@ void updateHapticDevice(void)
                     force += F_line_haptic;
 
                     if (boundingPoints == false) {
-                        /*cout << "Out of bounds: t = " << t_robot << " (points A and B at t=0 and t=1)" << endl;*/
-						force = cVector3d(0, 0, 0);
-					}
+                        cout << "PROBLEME, pas de bounding points" << endl;
+                        force = cVector3d(0, 0, 0);
+                    }
+
+                    
 
 					// ------ Compute desired robot position (project the movement of the haptic device to the line AB) ------ //
 
