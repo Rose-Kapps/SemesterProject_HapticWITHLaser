@@ -73,6 +73,9 @@ bool scan_x = false;
 bool scan_y = false;
 bool scan_z = false;
 
+Vec3 PointA;
+Vec3 PointB;
+
 
 bool first_loop = true; // DEBUGGING
 
@@ -1635,7 +1638,7 @@ void updateRobotDevice(void)
     static ofstream csvFile(filename, ios::app);
     if (fileIsEmpty) {
         // write header only if file is empty
-        csvFile << "x [m],y [m],z [m],Voltage [V]" << endl;
+        csvFile << "x [m],y [m],z [m],Voltage [V],timestamps,pointA_x,pointA_y,pointA_z,pointB_x,pointB_y,pointB_z" << endl;
     }
 
     // Deuxieme fichier csv ////////////////////
@@ -1800,14 +1803,24 @@ void updateRobotDevice(void)
 
         
 
-        if (Voltage_Copy > threshold)
-        {
+        if (haptic_state == LINEAR_EXPLORATION) {
+            auto now_time_plot = chrono::steady_clock::now();
+            long long timestamp_ms_plot = chrono::duration_cast<chrono::milliseconds>(now_time_plot.time_since_epoch()).count();
+
             csvFile << RobotPos_Copy.x() << ","
                 << RobotPos_Copy.y() << ","
                 << RobotPos_Copy.z() << ","
-                << Voltage_Copy << endl;
+                << Voltage_Copy << ","
+                << timestamp_ms_plot << ","
+                << PointA[0] << ","
+                << PointA[1] << ","
+                << PointA[2] << ","
+                << PointB[0] << ","
+                << PointB[1] << ","
+                << PointB[2]
+                << endl;
 
-            csvFile.flush(); // guarantee data is written to file immediately
+            csvFile.flush();
         }
 
         /*auto now_time = chrono::steady_clock::now();
@@ -2390,7 +2403,7 @@ void updateHapticDevice(void)
                     // -----------------------------------------------------------------------------------------------------------------------
 
                     // Store the points that corresponds to an interface point --> Take the position of the manipulating robot
-                    if (voltageLevel > 0.65) { //max value to adapt
+                    if (voltageLevel > 0.7) { //max value to adapt
 
                         Vec3 interface_point = { robotPos.x(),robotPos.y(),robotPos.z() };  // A CHANGER AVEC LE BUFFER!!!!!
                         
@@ -2410,6 +2423,9 @@ void updateHapticDevice(void)
                     if (list_of_interface_points.size() >= 2) { // threshold value to adpat
 
                         cout << "Enough interface points collected: " << list_of_interface_points.size() << " points." << endl;
+
+                        PointA = list_of_interface_points[0];
+                        PointB = list_of_interface_points[1];
 
 
 						//// ----- For planar approcimation ----- //
