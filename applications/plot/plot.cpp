@@ -81,6 +81,9 @@ bool first_loop = true; // DEBUGGING
 
 //chrono::high_resolution_clock::time_point timePointScan0 = chrono::high_resolution_clock::now();
 
+bool dir_perp_initialized = false;
+Vec3 last_dir_perp_filtered(0, 0, 0);
+
 int smoothed_ADCvalue;
 
 double voltageLevel;
@@ -2504,6 +2507,27 @@ void updateHapticDevice(void)
 					// Compute haptic force to follow the line defined by points A and B
                     double dist_perp = distanceToLine(virtualRobotPos_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3);
                     Vec3 dir_perp = perpendicularDirectionToLine(virtualRobotPos_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3);
+
+					// ------------------ Lissage de dir_perp pour éviter les petites oscillations ------------------ //
+
+                    double alpha = 0.85; // à ajuster
+
+					Vec3 dir_perp_filtered;
+
+                    if (!dir_perp_initialized) {
+                        last_dir_perp_filtered = dir_perp;
+                        dir_perp_initialized = true;
+                    }
+                    else {
+                        dir_perp_filtered = alpha * dir_perp + (1.0 - alpha) * last_dir_perp_filtered;
+
+                        if (dir_perp_filtered.norm() > 1e-6)
+                            dir_perp_filtered.normalize();
+
+						last_dir_perp_filtered = dir_perp_filtered;
+                    }
+
+					// --------------------------------------------------------------------------------------------- //
                     
 
                     double t = computeT(virtualRobotPos_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3); // just for plotting
