@@ -1888,7 +1888,7 @@ void updateHapticDevice(void)
 
     string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\HapticDebugV2\\";
     string folderPlane = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\PlaneForces\\";
-	string folderTHGLineScanning = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\THGLineScanningV2\\";
+	string folderTHGLineScanning = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\THGLineScanningV3\\";
     string folderTHGAutoScan = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\THGAutoScan\\";
     string folderZScan = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\X-Scan_sandblastedSample\\";
 
@@ -1989,9 +1989,13 @@ void updateHapticDevice(void)
             << "virtualRobotPos_HapticFrame_x,"
             << "virtualRobotPos_HapticFrame_y,"
             << "virtualRobotPos_HapticFrame_z,"
-            << "robotPos_HapticFrame_x,"
+			<< "ForceFeedback_x"
+			<< "ForceFeedback_y"
+			<< "ForceFeedback_z"
+			<< "ForceFeedback_magnitude"
+            /*<< "robotPos_HapticFrame_x,"
             << "robotPos_HapticFrame_y,"
-            << "robotPos_HapticFrame_z"
+            << "robotPos_HapticFrame_z"*/
             << endl;
     }
 
@@ -2561,6 +2565,8 @@ void updateHapticDevice(void)
                     // Force haptique perpendiculaire
                     Vec3 F_perp = -K_line * dist_perp * dir_perp - B_line * vel_normal * dir_perp;
 
+					double force_magnitude = F_perp.norm();
+
                     // Conversion vers CHAI3D
                     cVector3d F_line_haptic(F_perp[0], F_perp[1], F_perp[2]);
                     force += F_line_haptic;
@@ -2609,6 +2615,10 @@ void updateHapticDevice(void)
                             << virtualRobotPos.x() << ","
                             << virtualRobotPos.y() << ","
                             << virtualRobotPos.z() << ","
+							<< F_perp[0] << ","
+							<< F_perp[1] << ","
+							<< F_perp[2] << ","
+                            << force_magnitude
                             /*<< robotPos_HapticFrame.x() << ","
                             << robotPos_HapticFrame.y() << ","
                             << robotPos_HapticFrame.z()*/
