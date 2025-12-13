@@ -2101,44 +2101,14 @@ void updateHapticDevice(void)
 
         bool userButton = userButton0 | userButton1;
 
-
-
-		// A NE PAS UTILISER POUR LE CONTROLE --> DELAIS ET INSTABILITE !!!
-
-        //// get current position of robot device
-        //cVector3d robotPos(0, 0, 0);
-        //robotDevice->getPosition(robotPos);
-
-        //// get current velocity of robot device
-        //cVector3d robotVel(0, 0, 0);
-        //robotDevice->getLinearVelocity(robotVel);
-
-        //  on prend la valeur de robotPos du buffer 
-
+        
+		//  Get the positon of the manipulating robot from the buffer  ///////////////////////
         Vec3 robotPos;
-
-        // On lit simplement le buffer actif
         Vec3* src = active.load(memory_order_acquire);
+        robotPos = *src; 
 
-        robotPos = *src; // copie locale
-
-
-        ////// THG signal integration
-
-        //// THG_signal_normalization (max value depends on the sclae factor)  //////////////////////////////////////////
-        //double min_voltage = 0.045;
-        //double max_voltage = 2.9;
-
-        ///*if (scaleFactor == 0.02) {
-        //    max_voltage = 1.5;
-        //}
-
-        //else if (scaleFactor == 0.001) {
-        //    max_voltage = 2.9;
-        //}*/
-
-        //// THG signal integration 
-        // THG_signal_normalization (max value depends on the sclae factor) 
+        
+		// THG_signal_normalization (max value depends on the scale factor) /////////////////////
         double min_voltage = 0.047;
         double max_voltage = 0.0;
 
@@ -2148,13 +2118,11 @@ void updateHapticDevice(void)
         else if (scaleFactor == 0.001) {
             max_voltage = 1.2;
         }
-        // normalized value multiplied by three for amplification 
-        /*double THGsignal = cClamp((voltageSmoothed - min_voltage) / (max_voltage - min_voltage), 0.0, 1.0);*/
+        
+        double THGsignal = cClamp((voltageLevel - min_voltage) / (max_voltage - min_voltage), 0.0, 1.0);  
 
-        // normalized value multiplied by three for amplification
-        double THGsignal = cClamp((voltageLevel - min_voltage) / (max_voltage - min_voltage), 0.0, 1.0);  //////////////////////////
-
-        if (scaleFactor != 0.02 && scaleFactor != 0.001)  /////////////////////////////////////////
+		// for the other scale factors, we don't want any haptic feedback based on THG signal
+        if (scaleFactor != 0.02 && scaleFactor != 0.001)  
         {
             THGsignal = 0.0;
         }
@@ -2545,7 +2513,7 @@ void updateHapticDevice(void)
                     Vec3 uAB = AB.normalized();
 
                     // Stiffness & damping
-                    double K_line = 700000;
+                    double K_line = 700/scaleFactor;
                     double B_line = 100;
 
                     // Vitesse perpendiculaire : projeter la vitesse sur la direction perpendiculaire
