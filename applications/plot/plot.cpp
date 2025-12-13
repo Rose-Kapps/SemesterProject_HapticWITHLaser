@@ -2146,7 +2146,7 @@ void updateHapticDevice(void)
 					Vec3 virtualRobotPos_Vec3(virtualRobotPos.x(), virtualRobotPos.y(), virtualRobotPos.z());
 
 					// ------------------- Compute force feedback to follow the plane ---------------- //
-                    double K_normal = 700000;
+                    double K_normal = 700/scaleFactor;
                     double damping_normal = 70;
 
                     double d = signedDistanceToPlane(virtualRobotPos_Vec3, centroid_HapticFrame_Vec3, normal_HapticFrame_Vec3);
