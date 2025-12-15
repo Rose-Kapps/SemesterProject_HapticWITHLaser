@@ -1563,10 +1563,10 @@ void updateSensor(void)
             long long timestamp_ms = chrono::duration_cast<chrono::milliseconds>(now.time_since_epoch()).count();
 
 
-            if (voltageLevel > threshold || voltageRaw > threshold) {
-                csvFile << timestamp_ms << "," << voltageLevel << "\n";
-                csvFile.flush();  // ensure data is saved
-            }
+           
+            //csvFile << timestamp_ms << "," << voltageLevel << "\n";
+            //csvFile.flush();  // ensure data is saved
+            
 
             // compute a haptic damping factor based on laser signal
             double dampingGain = 0.4;
@@ -1989,10 +1989,16 @@ void updateHapticDevice(void)
             << "virtualRobotPos_HapticFrame_x,"
             << "virtualRobotPos_HapticFrame_y,"
             << "virtualRobotPos_HapticFrame_z,"
-			<< "ForceFeedback_x"
-			<< "ForceFeedback_y"
-			<< "ForceFeedback_z"
-			<< "ForceFeedback_magnitude"
+			<< "ForceFeedback_x,"
+			<< "ForceFeedback_y,"
+			<< "ForceFeedback_z,"
+			<< "ForceFeedback_magnitude,"
+            << "dir_perp_x," 
+            << "dir_perp_y," 
+            << "dir_perp_z," 
+            << "dir_perp_filtered_x," 
+            << "dir_perp_filtered_y,"
+            << "dir_perp_filtered_z" 
             /*<< "robotPos_HapticFrame_x,"
             << "robotPos_HapticFrame_y,"
             << "robotPos_HapticFrame_z"*/
@@ -2120,10 +2126,10 @@ void updateHapticDevice(void)
         double max_voltage = 0.0;
 
         if (scaleFactor == 0.02) {
-            max_voltage = 0.5;
+            max_voltage = 0.3;
         }
         else if (scaleFactor == 0.001) {
-            max_voltage = 1.2;
+            max_voltage = 0.9;
         }
         
         double THGsignal = cClamp((voltageLevel - min_voltage) / (max_voltage - min_voltage), 0.0, 1.0);  
@@ -2414,7 +2420,7 @@ void updateHapticDevice(void)
                     // -----------------------------------------------------------------------------------------------------------------------
 
                     // Store the points that corresponds to an interface point --> Take the position of the manipulating robot
-                    if (voltageLevel > 0.6) { //max value to adapt
+                    if (voltageLevel > 0.8) { //max value to adapt
 
                         Vec3 interface_point = { robotPos.x(),robotPos.y(),robotPos.z() };  // A CHANGER AVEC LE BUFFER!!!!!
                         
@@ -2496,11 +2502,11 @@ void updateHapticDevice(void)
 
                    virtualRobotPos = robotPos + scaleFactor * (hapticPos - hapticPos0);
 
-                   double correction_factor = 0.5;
+       //            double correction_factor = 0.7;
 
-				   // -------------------- Correction of the virtual robot position to match the real one ------------------- //
-				   virtualRobotPos += correction_factor * (robotPos - virtualRobotPos);
-                 
+				   //// -------------------- Correction of the virtual robot position to match the real one ------------------- //
+				   //virtualRobotPos += correction_factor * (robotPos - virtualRobotPos);
+       //          
 
                     // ------------------- CONVERSION EN VEC3 POUR UTILISER LES FONCTIONS DE EIGEN ---------------- //
                     Vec3 virtualRobotPos_Vec3(virtualRobotPos.x(), virtualRobotPos.y(), virtualRobotPos.z());
@@ -2514,7 +2520,7 @@ void updateHapticDevice(void)
 
 					// ------------------ Lissage de dir_perp pour éviter les petites oscillations ------------------ //
 
-                    double alpha = 0.85; // à ajuster
+                    double alpha = 0.6; // à ajuster
 
 					Vec3 dir_perp_filtered;
 
@@ -2531,6 +2537,8 @@ void updateHapticDevice(void)
 						last_dir_perp_filtered = dir_perp_filtered;
                     }
 
+                    /*dir_perp_filtered = dir_perp;*/
+
 					// --------------------------------------------------------------------------------------------- //
                     
 
@@ -2546,7 +2554,7 @@ void updateHapticDevice(void)
 
                     // Vitesse perpendiculaire : projeter la vitesse sur la direction perpendiculaire
                     Vec3 V(hapticVel.x(), hapticVel.y(), hapticVel.z());
-                    double vel_normal = V.dot(dir_perp);
+                    double vel_normal = V.dot(dir_perp_filtered);
 
 					// Projeter la vitesse sur la direction de la ligne
                     double velAlong = V.dot(uAB);
@@ -2563,7 +2571,7 @@ void updateHapticDevice(void)
                     }
 
                     // Force haptique perpendiculaire
-                    Vec3 F_perp = -K_line * dist_perp * dir_perp - B_line * vel_normal * dir_perp;
+                    Vec3 F_perp = -K_line * dist_perp * dir_perp_filtered - B_line * vel_normal * dir_perp_filtered;
 
 					double force_magnitude = F_perp.norm();
 
@@ -2591,42 +2599,48 @@ void updateHapticDevice(void)
                     //if (log_counter % 100 == 0) {   // Downsampling 
 
 
-                    if (dist_perp < 2e-5) {
-                        // Log data about line forces for debugging
-                        auto now_time_line = chrono::steady_clock::now();
-                        long long timestamp_ms_line = chrono::duration_cast<chrono::milliseconds>(now_time_line.time_since_epoch()).count();
+                    
+                    // Log data about line forces for debugging
+                    auto now_time_line = chrono::steady_clock::now();
+                    long long timestamp_ms_line = chrono::duration_cast<chrono::milliseconds>(now_time_line.time_since_epoch()).count();
 
-                        csvFile_THGLineScanning << timestamp_ms_line << ","
-                            << t << ","
-                            << voltageLevel << ","
-                            << THGsignal << ","
-                            << robotPos.x() << ","
-                            << robotPos.y() << ","
-                            << robotPos.z() << ","
-                            << directionAlongSegment << ","
-                            << dist_perp << ","
-                            /*<< dir_perp << ","*/    // ATTENTION --> IL FAUT DIFFERENCIER X Y ET Z SINON BUG DANS LE CSV
-                            << A_HapticFrame.x() << ","
-                            << A_HapticFrame.y() << ","
-                            << A_HapticFrame.z() << ","
-                            << B_HapticFrame.x() << ","
-                            << B_HapticFrame.y() << ","
-                            << B_HapticFrame.z() << ","
-                            << virtualRobotPos.x() << ","
-                            << virtualRobotPos.y() << ","
-                            << virtualRobotPos.z() << ","
-							<< F_perp[0] << ","
-							<< F_perp[1] << ","
-							<< F_perp[2] << ","
-                            << force_magnitude
-                            /*<< robotPos_HapticFrame.x() << ","
-                            << robotPos_HapticFrame.y() << ","
-                            << robotPos_HapticFrame.z()*/
-                            << endl;
+                    csvFile_THGLineScanning << timestamp_ms_line << ","
+                        << t << ","
+                        << voltageLevel << ","
+                        << THGsignal << ","
+                        << robotPos.x() << ","
+                        << robotPos.y() << ","
+                        << robotPos.z() << ","
+                        << directionAlongSegment << ","
+                        << dist_perp << ","
+                        /*<< dir_perp << ","*/    // ATTENTION --> IL FAUT DIFFERENCIER X Y ET Z SINON BUG DANS LE CSV
+                        << A_HapticFrame.x() << ","
+                        << A_HapticFrame.y() << ","
+                        << A_HapticFrame.z() << ","
+                        << B_HapticFrame.x() << ","
+                        << B_HapticFrame.y() << ","
+                        << B_HapticFrame.z() << ","
+                        << virtualRobotPos.x() << ","
+                        << virtualRobotPos.y() << ","
+                        << virtualRobotPos.z() << ","
+						<< F_perp[0] << ","
+						<< F_perp[1] << ","
+						<< F_perp[2] << ","
+                        << force_magnitude << ","
+                        << dir_perp[0] << ","
+                        << dir_perp[1] << ","
+                        << dir_perp[2] << ","
+                        << dir_perp_filtered[0] << ","
+                        << dir_perp_filtered[1] << ","
+                        << dir_perp_filtered[2] 
+                        /*<< robotPos_HapticFrame.x() << ","
+                        << robotPos_HapticFrame.y() << ","
+                        << robotPos_HapticFrame.z()*/
+                        << endl;
 
-                        // forcer le flush pour sauvegarder en temps réel
-                        csvFilePlane.flush();
-                    }
+                    // forcer le flush pour sauvegarder en temps réel
+                    csvFilePlane.flush();
+                    
 
                   
 
