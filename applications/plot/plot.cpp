@@ -1890,7 +1890,7 @@ void updateHapticDevice(void)
     string folderPlane = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\PlaneForces\\";
 	string folderTHGLineScanning = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\THGLineScanningV3\\";
     string folderTHGAutoScan = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\THGAutoScan\\";
-    string folderZScan = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\X-Scan_sandblastedSample\\";
+    string folderZScan = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\Z-Scan\\";
 
 
     // Création du nom de fichier avec timestamp
@@ -2060,7 +2060,7 @@ void updateHapticDevice(void)
     //Nom du cinquième fichier csv
     ostringstream ossZScan;
     ossZScan << folderZScan
-        << "sandblastedSample"
+        << "glassSample"
         << put_time(now, "%Y-%m-%d_%H-%M-%S")
         << ".csv";
 
@@ -2080,7 +2080,7 @@ void updateHapticDevice(void)
     if (fileIsEmpty_ZScan) {
         csvFile_ZScan
             << "voltageLevel[V],"
-            << "robotPos_x[m]"
+            << "robotPos_z[m]"
             << endl;
     }
 
@@ -2275,10 +2275,10 @@ void updateHapticDevice(void)
 
             }*/
 
-            if (scan_x == true) {
+            if (scan_z == true) {
                 csvFile_ZScan
                     << voltageLevel << ","
-                    << robotPos.x()
+                    << robotPos.z()
                     << endl;
 
             }
@@ -2420,7 +2420,7 @@ void updateHapticDevice(void)
                     // -----------------------------------------------------------------------------------------------------------------------
 
                     // Store the points that corresponds to an interface point --> Take the position of the manipulating robot
-                    if (voltageLevel > 0.8) { //max value to adapt
+                    if (voltageLevel > 0.5) { //max value to adapt
 
                         Vec3 interface_point = { robotPos.x(),robotPos.y(),robotPos.z() };  // A CHANGER AVEC LE BUFFER!!!!!
                         
@@ -2520,7 +2520,7 @@ void updateHapticDevice(void)
 
 					// ------------------ Lissage de dir_perp pour éviter les petites oscillations ------------------ //
 
-                    double alpha = 0.6; // à ajuster
+                    double alpha = 0.5; // à ajuster
 
 					Vec3 dir_perp_filtered;
 
@@ -2537,7 +2537,7 @@ void updateHapticDevice(void)
 						last_dir_perp_filtered = dir_perp_filtered;
                     }
 
-                    /*dir_perp_filtered = dir_perp;*/
+                    dir_perp_filtered = dir_perp;
 
 					// --------------------------------------------------------------------------------------------- //
                     
