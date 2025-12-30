@@ -450,6 +450,12 @@ double distanceToLine(const Vec3& P, const Vec3& A, const Vec3& B) {
     return (P - proj).norm();
 }
 
+// Vecteur entre le point et sa projection sur la ligne
+Vec3 vectorToLine(const Vec3& P, const Vec3& A, const Vec3& B) {
+    Vec3 proj = projectPointToLine(P, A, B);
+    return (P - proj);
+}
+
 // Direction perpendiculaire normalisée (force direction)
 Vec3 perpendicularDirectionToLine(const Vec3& P, const Vec3& A, const Vec3& B) {
     Vec3 proj = projectPointToLine(P, A, B);
