@@ -42,7 +42,6 @@ Vec3 v;
 
 Vec3 bufferA;
 Vec3 bufferB;
-
 atomic<Vec3*> active;
 
 //------------------------------------------------------------------------------
@@ -55,13 +54,19 @@ atomic<Vec3*> active;
 // STATE_TELEOPERATION:
 // The operator is moving the haptic device and driving the robot to a new 
 // desired position.
+// 
+// FIND_INTERFACE: (haptic state)
+// The operator can move freely to find interface points
+// 
+// LINEAR_EXPLORATION: (haptic state)
+// The operator is constrained to move along a line
+// 
 //------------------------------------------------------------------------------
 enum cState
 {
     STATE_IDLE,
     STATE_TELEOPERATION,
 	FIND_INTERFACE,
-	PLANAR_EXPLORATION,
     LINEAR_EXPLORATION
 };
 
@@ -73,42 +78,15 @@ bool scan_x = false;
 bool scan_y = false;
 bool scan_z = false;
 
+// points defining the line for linear exploration
 Vec3 PointA;
 Vec3 PointB;
 
-
-bool first_loop = true; // DEBUGGING
-
-//chrono::high_resolution_clock::time_point timePointScan0 = chrono::high_resolution_clock::now();
-
-bool dir_perp_initialized = false;
-Vec3 last_dir_perp_filtered(0, 0, 0);
-
+// raw and smoothed voltage values from THG sensor
 int smoothed_ADCvalue;
-
 double voltageLevel;
-
-double lastVoltageLevel;
-
 double voltageRaw;
-
 double voltageSmoothed;
-
-double lastTHGsignal;
-
-double zPosDesired;
-
-bool interface_point_taken;
-bool find_interface;
-bool planar_exploration;
-
-int directionAlongSegment = 0;
-
-int log_counter = 0;
-
-cVector3d lastVirtualRobotPos(0,0,0);
-
-cVector3d robotPosShared(0, 0, 0);
 
 // a flag to indicate if the simulation currently running
 bool simulationRunning = false;
@@ -181,16 +159,11 @@ cState state;
 // haptic state machine
 cState haptic_state = FIND_INTERFACE;
 
+// virtual robot position used for haptic rendering
 cVector3d virtualRobotPos(0, 0, 0);
 
+// list of interface points collected during FIND_INTERFACE state
 vector<Vec3> list_of_interface_points;
-
-//vector<Vec3> list_of_interface_points = {
-//    Vec3(-0.0217047, -0.0264976, -0.030173),
-//    Vec3(-0.0283868, -0.0278065, -0.0303112)
-//};
-
-double threshold = 0.05;  // 2V now before it was 90mV
 
 //------------------------------------------------------------------------------
 // CHAI3D GRAPHIC VARIABLES AND OBJECTS
@@ -404,7 +377,7 @@ void fitPlaneSVD(const std::vector<Vec3>& points, Vec3& centroid, Vec3& normal, 
     singularValues = svd.singularValues();
     // V columns are principal components. The normal = last column of V (smallest singular value)
     Eigen::Matrix3d V = svd.matrixV();
-    normal = V.col(2); // colonne associée à la plus petite variance
+    normal = V.col(2); // column associated to smallest variance
     normal.normalize();
 }
 
@@ -429,34 +402,34 @@ void planeBasis(const Vec3& normal, Vec3& u, Vec3& v) {
     v = n.cross(u).normalized();
 }
 
-// Projection orthogonale d’un point sur la droite AB
+// Orthogonal projection of a point onto the line AB
 Vec3 projectPointToLine(const Vec3& P, const Vec3& A, const Vec3& B) {
     Vec3 AB = B - A;
     Vec3 AP = P - A;
-    double t = AP.dot(AB) / AB.dot(AB);  // projection scalaire
+	double t = AP.dot(AB) / AB.dot(AB);  // Scalar projection
     return A + t * AB;
 }
 
-// Projection orthogonale d’un vecteur sur la droite AB
+// Orthogonal projection of a vector onto the line AB
 Vec3 projectVectorToLine(const Vec3& vector, const Vec3& A, const Vec3& B) {
     Vec3 AB = B - A;
-    Vec3 projected_vector = (vector.dot(AB) / AB.dot(AB))*AB;  // projection scalaire
+	Vec3 projected_vector = (vector.dot(AB) / AB.dot(AB)) * AB;  // Scalar projection
     return projected_vector;
 }
 
-// Distance signée perpendiculaire à la droite
+// Signed distance from point to line AB
 double distanceToLine(const Vec3& P, const Vec3& A, const Vec3& B) {
     Vec3 proj = projectPointToLine(P, A, B);
     return (P - proj).norm();
 }
 
-// Vecteur entre le point et sa projection sur la ligne
+// Vector between point and its projection onto line AB
 Vec3 vectorToLine(const Vec3& P, const Vec3& A, const Vec3& B) {
     Vec3 proj = projectPointToLine(P, A, B);
     return (P - proj);
 }
 
-// Direction perpendiculaire normalisée (force direction)
+// Normalized perpendicular direction from point to line AB
 Vec3 perpendicularDirectionToLine(const Vec3& P, const Vec3& A, const Vec3& B) {
     Vec3 proj = projectPointToLine(P, A, B);
     Vec3 d = P - proj;
@@ -471,7 +444,7 @@ double computeT(const Vec3& P, const Vec3& A, const Vec3& B)
     Vec3 AP = P - A;
 
     double denom = AB.dot(AB);
-    if (denom < 1e-12) return 0.0; // A et B identiques, sécurité
+    if (denom < 1e-12) return 0.0; 
 
     double t = AP.dot(AB) / denom;
 
@@ -479,14 +452,14 @@ double computeT(const Vec3& P, const Vec3& A, const Vec3& B)
 }
 
 
-
+// Verify if newPoint is at least 'threshold' distance away from all points in 'points'
 bool isFarEnough(const vector<Vec3>& points, const Vec3& newPoint, double threshold) {
     for (const auto& p : points) {
         if ((p - newPoint).norm() < threshold) {
-            return false; // Trop proche d'un point existant
+            return false; // Too close
         }
     }
-    return true; // Assez éloigné
+    return true; // Far enough
 }
 
 
@@ -1000,14 +973,12 @@ void keyCallback(GLFWwindow* a_window, int a_key, int a_scancode, int a_action, 
                 cVector3d current_position(0,0,0);
                 switch (a_key) {
                     case GLFW_KEY_G:
-                        directionAlongSegment = 1;  // JUST TO PLOT AND DEBUG
                         outFile << "Position in x [m],Voltage [V]" << std::endl;
                         break;
                     case GLFW_KEY_H:
                         outFile << "Position in y [m],Voltage [V]" << std::endl;
                         break;
                     case GLFW_KEY_J:
-                        directionAlongSegment = -1; // JUST TO PLOT AND DEBUG
                         outFile << "Position in z [m],Voltage [V]" << std::endl;
                         robotDevice->getPosition(current_position);
                         
@@ -1450,45 +1421,7 @@ void updateSensor(void)
 
     double alpha = 0.003;
 
-    string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\Characterization_THG_scaleFactor\\";
-
-    //string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\Test_LowPassFilter\\";
-
-    /*string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\Voltage_FilteringData\\";*/
-
-    //string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\ADCValue_FilteringData\\";  ////////////////////////// to change between the different tests
-
-    // Generate filename with parameters and timestamp
-    time_t t = time(nullptr);
-    tm* now = localtime(&t);
-
-    std::ostringstream oss;
-    oss << folder
-        << "_"
-        << put_time(now, "%Y-%m-%d_%H-%M-%S")
-        << ".csv";
-    /*oss << folder
-        << "SignalFiltering_"
-        << windowSize << "_"
-        << fixed << setprecision(2) << sigma << "_"
-        << put_time(now, "%Y-%m-%d_%H-%M-%S")
-        << ".csv";*/
-    //oss << folder
-    //    << "SignalFiltering_"
-    //    << StepSmoother_tolerance << "_"
-    //    << fixed << setprecision(2) << StepSmoother_persistance << "_"
-    //    << put_time(now, "%Y-%m-%d_%H-%M-%S")
-    //    << ".csv";        ///////////////////////////////////////////////////// to change between the different tests
-
-    const std::string filename = oss.str();
-
-    bool fileIsEmpty = !fs::exists(filename) || fs::file_size(filename) == 0;
-
-    static std::ofstream csvFile(filename, ios::app);
-    if (fileIsEmpty) {
-        csvFile << "timestamp_ms,voltage_level[V]\n";
-    }
-
+    
     //----------------------------------------------------------------------
     // FILTER INITIALIZATION
     //----------------------------------------------------------------------
@@ -1498,7 +1431,6 @@ void updateSensor(void)
     static GaussianFilter filter(windowSize, sigma);
 
     static LowPassFilter THGfilter(alpha);
-
 
     //----------------------------------------------------------------------
     // MAIN LOOP
@@ -1552,7 +1484,6 @@ void updateSensor(void)
             
             
             // --- Compute raw voltage ---
-            /*voltageRaw = round(100 * cClamp(5.0 * (((double)dataValue - 2048.0) / 964.0), 0.0, 5.0)) / 100;*/
             voltageRaw = cClamp(5.0 * (((double)dataValue - 2048.0) / 964.0), 0.0, 5.0);
 
             voltageSmoothed = cClamp(5.0 * (((double)smoothed_ADCvalue - 2048.0) / 964.0), 0.0, 5.0);
@@ -1563,38 +1494,20 @@ void updateSensor(void)
            /* voltageLevel = THGfilter.apply(voltageRaw);*/
 
             voltageLevel = voltageRaw;
-
-            // --- Log both values to CSV ---
-            auto now = chrono::steady_clock::now();
-            long long timestamp_ms = chrono::duration_cast<chrono::milliseconds>(now.time_since_epoch()).count();
-
-
-           
-            //csvFile << timestamp_ms << "," << voltageLevel << "\n";
-            //csvFile.flush();  // ensure data is saved
             
 
             // compute a haptic damping factor based on laser signal
             double dampingGain = 0.4;
             hapticDampingFactor = dampingGain * voltageLevel;
-
-            lastVoltageLevel = voltageLevel;
             
             // display data to scope
             scope->setSignalValues(voltageLevel);
           
         }
 
-        
-
         // update frequency counter
         freqCounterSensor.signal(Count);
     }
-
-    //----------------------------------------------------------------------
-   // CLEANUP
-   //----------------------------------------------------------------------
-    csvFile.close();
 
     // the BACKGROUND operation must be explicitly stopped
     //     Parameters:
@@ -1618,62 +1531,6 @@ void updateRobotDevice(void)
     // get time point 0
     chrono::high_resolution_clock::time_point timePoint0 = chrono::high_resolution_clock::now();
 
-    //string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\RobotData\\";
-    string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\3DData\\";
-    string folder_XScan = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\X-Scan\\";
-
-    
-    time_t t = time(nullptr);
-    tm* now = localtime(&t);
-
-    ostringstream oss;
-    oss << folder
-        /*<< "interface_points_"*/
-        << put_time(now, "%Y-%m-%d_%H-%M-%S")
-        << ".csv";
-
-    const string filename = oss.str();
-
-    bool fileIsEmpty = !fs::exists(filename) || fs::file_size(filename) == 0;
-
-    //// open csv file to log interface points
-    //static ofstream csvFile(filename, ios::app);
-    //if (fileIsEmpty) {
-    //    // write header only if file is empty
-    //    csvFile << "timestamp[ms],x [m],y [m],z [m],Voltage [V],directionAlongSegment" << endl;
-    //}
-
-    // open csv file to log interface points
-    static ofstream csvFile(filename, ios::app);
-    if (fileIsEmpty) {
-        // write header only if file is empty
-        csvFile << "x [m],y [m],z [m],Voltage [V],timestamps,pointA_x,pointA_y,pointA_z,pointB_x,pointB_y,pointB_z" << endl;
-    }
-
-    // Deuxieme fichier csv ////////////////////
-    ostringstream oss_XScan;
-    oss_XScan << folder_XScan
-        /*<< "interface_points_"*/
-        << put_time(now, "%Y-%m-%d_%H-%M-%S")
-        << ".csv";
-
-    const string filename_XScan = oss_XScan.str();
-
-    bool fileIsEmpty_XScan = !fs::exists(filename_XScan) || fs::file_size(filename_XScan) == 0;
-
-    //// open csv file to log interface points
-    //static ofstream csvFile(filename, ios::app);
-    //if (fileIsEmpty) {
-    //    // write header only if file is empty
-    //    csvFile << "timestamp[ms],x [m],y [m],z [m],Voltage [V],directionAlongSegment" << endl;
-    //}
-
-    // open csv file to log interface points
-    static ofstream csvFile_XScan(filename_XScan, ios::app);
-    if (fileIsEmpty_XScan) {
-        // write header only if file is empty
-        csvFile_XScan << "timestamps_ms,robotPos_x[m],robotPos_y[m],robotPos_z[m],robotVel_x,robotVel_y,robotVel_z" << endl;
-    }
 
     // main robot control loop
     while (simulationRunning)
@@ -1689,20 +1546,18 @@ void updateRobotDevice(void)
 
         Vec3 robotPos(pos.x(), pos.y(), pos.z());
 
-       /* cout << "position du robot manipulateur: " << pos << endl;*/
+        // ----- Buffer to store robot pos ----- //
 
-        // ----- Buffer pour store robot pos ----- //
-
-        // 1. On récupère l'adresse du buffer actif
+		// Get address of current active buffer
         Vec3* currentActive = active.load(memory_order_acquire);
 
-        // 2. On choisit l'autre buffer
+		// Choose the target buffer (the one that is NOT active)
         Vec3* target = (currentActive == &bufferA) ? &bufferB : &bufferA;
 
-        // 3. On écrit dedans (ce buffer n'est JAMAIS lu actuellement)
+		// Write in new robot position
         *target = robotPos;
 
-        // 4. On rend ce buffer "actif"
+		// Set this buffer as active
         active.store(target, std::memory_order_release);
 
         // ----------------------------------------
@@ -1711,22 +1566,6 @@ void updateRobotDevice(void)
         cVector3d vel(0, 0, 0);
         robotDevice->getLinearVelocity(vel);
 
-        auto now_time = chrono::steady_clock::now();
-        long long timestamp_ms = chrono::duration_cast<chrono::milliseconds>(now_time.time_since_epoch()).count();
-
-        if (scan_x == true || scan_y == true) {
-
-            csvFile_XScan << timestamp_ms << ","
-                << pos.x() << ","
-                << pos.y() << ","
-                << pos.z() << ","
-                << vel.x() << ","
-                << vel.y() << ","
-                << vel.z()
-                << endl;
-
-        }
-
 
         // acquire mutex
         mutexDevices.acquire();
@@ -1734,64 +1573,7 @@ void updateRobotDevice(void)
         // update variables by taking into account rotation matrix of robot
         robotPosCur = robotRot * pos;
         robotVelCur = robotRot * vel;
-
        
-
-        // Secure copy of shared variables
-        double Voltage_Copy = voltageLevel;
-        cVector3d RobotPos_Copy = robotPosCur;
-
-        // compute signal gradient
-
-        //if (voltageLevel > 1) {
-        //    //gradient = computeGradient(robotPosCur, voltageLevel);
-
-        //}
-
-        signalDiff = computeSignalDif(robotPosCur, voltageLevel);
-        //cout << signalDiff << endl;
-
-  //      // ---------------------------  not same force applied to manipulating robot depending on haptic state ------------------------------
-
-		//cVector3d force(0, 0, 0);
-
-  //      if (haptic_state == FIND_INTERFACE)
-  //      {
-  //          // compute spring force to make the manipulating robot follow the haptic device 
-  //          double Kp = 2000;
-  //          double Kv = 10;
-  //          force += Kp * (robotPosDes - robotPosCur) - Kv * robotVelCur;
-
-  //          force = cTranspose(robotRot) * force; ////////////////////////////////////////////
-  //      }
-  //      else if (haptic_state == PLANAR_EXPLORATION)
-  //      {
-
-		//	// ATTENTION AUX CONVERSIONS ENTRE cVector3d ET Vec3 !!!!!!
-
-  //          Vec3 velocity(vel.x(), vel.y(), vel.z());
-  //          double vel_normal = velocity.dot(normal);
-
-		//	Vec3 robotPosCur_Vec3(robotPosCur.x(), robotPosCur.y(), robotPosCur.z());
-
-  //          // compute spring force to make the manipulating robot follow the plane 
-  //          
-  //          double K_normal = 50;
-		//	double damping_normal = 40;
-		//	double d = signedDistanceToPlane(robotPosCur_Vec3, centroid, normal);
-
-  //          Vec3 F_normal(0, 0, 0);
-
-  //          F_normal += -K_normal * d * normal;
-  //          F_normal += -damping_normal * vel_normal * normal;
-
-		//	cVector3d F_normal_converted(F_normal[0],F_normal[1], F_normal[2]);
-  //          force += F_normal_converted;
-  //      }
-	
-  //      // ------------------------------------------------------------------ END  ------------------------------------------------------------
-
-
 
         //// compute spring force to move robot toward desired position (robotPosDes) 
         double Kp = 5000;
@@ -1806,46 +1588,7 @@ void updateRobotDevice(void)
         // apply force after taking into account rotation matrix of robot
         robotDevice->setForce(cTranspose(robotRot) * force);
 
-		//robotDevice->setForce(force);   //ATTENTION AUX MATRICES DE ROTATION ET AU CHANGEMENTS DE REPERE !!!!!!
-
         add_value();
-
-        
-
-        if (haptic_state == LINEAR_EXPLORATION) {
-            auto now_time_plot = chrono::steady_clock::now();
-            long long timestamp_ms_plot = chrono::duration_cast<chrono::milliseconds>(now_time_plot.time_since_epoch()).count();
-
-            csvFile << RobotPos_Copy.x() << ","
-                << RobotPos_Copy.y() << ","
-                << RobotPos_Copy.z() << ","
-                << Voltage_Copy << ","
-                << timestamp_ms_plot << ","
-                << PointA[0] << ","
-                << PointA[1] << ","
-                << PointA[2] << ","
-                << PointB[0] << ","
-                << PointB[1] << ","
-                << PointB[2]
-                << endl;
-
-            csvFile.flush();
-        }
-
-        /*auto now_time = chrono::steady_clock::now();
-        long long timestamp_ms = chrono::duration_cast<chrono::milliseconds>(now_time.time_since_epoch()).count();
-
-        if (directionAlongSegment == 1 || directionAlongSegment == -1) {
-
-            csvFile << timestamp_ms << ","
-                << robotPosCur.x() << ","
-                << robotPosCur.y() << ","
-                << robotPosCur.z() << ","
-                << voltageLevel << ","
-                << directionAlongSegment
-                << endl;
-        }*/
-
 
         // update frequency counter
         freqCounterRobotDevice.signal();
@@ -1855,8 +1598,6 @@ void updateRobotDevice(void)
 
     // close connection to robot
     robotDevice->close();
-    // close csv file
-    csvFile.close();
 }
 
 
@@ -1867,10 +1608,6 @@ void updateHapticDevice(void)
 {
 
     //INITIALIZATION
-
-    lastTHGsignal = 0.0;
-
-    int idlePeriod = 0;
 
     // variable to store robot device position when user button is pressed
     cVector3d robotPosDes0;
@@ -1888,212 +1625,6 @@ void updateHapticDevice(void)
     // activate haptic forces
     hapticDevice->enableForces(true);
 
-
-    //// set spring stiffness constant
-    //double Kp = 2000;
-
-    string folder = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\HapticDebugV2\\";
-    string folderPlane = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\PlaneForces\\";
-	string folderTHGLineScanning = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\THGLineScanningV3\\";
-    string folderTHGAutoScan = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\THGAutoScan\\";
-    string folderZScan = "C:\\Users\\Sophie Meuwly\\OneDrive - epfl.ch\\Bureau\\LaserCraft_Sept2025-vRose\\LaserCraft_2024\\DataProcessing\\Z-Scan\\";
-
-
-    // Création du nom de fichier avec timestamp
-    time_t t = time(nullptr);
-    tm* now = localtime(&t);
-
-    ostringstream oss;
-    oss << folder
-        << "HapticDebugV2_"
-        << put_time(now, "%Y-%m-%d_%H-%M-%S")
-        << ".csv";
-
-    const string filename = oss.str();
-
-    // Vérifier si fichier existe déjà (normalement non)
-    bool fileIsEmpty = !fs::exists(filename) || fs::file_size(filename) == 0;
-
-
-
-    // Créer ou ouvrir le fichier CSV
-   /* static ofstream csvFile(filename, ios::app);
-    if (fileIsEmpty) {
-        csvFile << "timestamp_ms,"
-            << "hapticPos_x[m],hapticPos_y[m],hapticPos_z[m],"
-            << "zPosDesired[m],"
-            << "voltageLevel[V],"
-            << "THGsignal,"
-            << "lastTHGsignal,"
-            << "Fz_stiff_z[N],"
-            << "idlePeriod"
-            << endl;
-    }*/
-
-    static ofstream csvFile(filename, ios::app);
-    if (fileIsEmpty) {
-        csvFile << "timestamp_ms,"
-            << "hapticPos_x[m],hapticPos_y[m],hapticPos_z[m],"
-            << "robotPos_x[m],robotPos_y[m],robotPos_z[m],"
-            << "voltageLevel[V],"
-            << "THGsignal,"
-            << "interface_point_taken,"
-            << "find_interface,"
-            << "planar_exploration,"
-            << "idlePeriod"
-            << endl;
-    }
-
-    // Nom du second fichier (dans le même dossier)
-    ostringstream ossPlane;
-    ossPlane << folderPlane
-        << "PlaneForces_"
-        << put_time(now, "%Y-%m-%d_%H-%M-%S")
-        << ".csv";
-
-    const string filenamePlane = ossPlane.str();
-
-    bool fileIsEmptyPlane = !fs::exists(filenamePlane) || fs::file_size(filenamePlane) == 0;
-
-    static ofstream csvFilePlane(filenamePlane, ios::app);
-    if (fileIsEmptyPlane) {
-        csvFilePlane << "timestamp_ms,"
-            << "d[m],"
-            << "vel_normal[m/s],"
-            << "F_normalWITHOUTdamping_x[N],F_normalWITHOUTdamping_y[N],F_normalWITHOUTdamping_z[N],"
-            << "F_normalWITHdamping_x[N],F_normalWITHdamping_y[N],F_normalWITHdamping_z[N]"
-            << endl;
-    }
-
-	// Nom du troisième fichier 
-    ostringstream ossTHGLineScanning;
-	ossTHGLineScanning << folderTHGLineScanning
-        << "THGLineScanning_"
-        << put_time(now, "%Y-%m-%d_%H-%M-%S")
-        << ".csv";
-
-    const string filename_THGLineScanning = ossTHGLineScanning.str();
-
-    bool fileIsEmpty_THGLineScanning = !fs::exists(filename_THGLineScanning) || fs::file_size(filename_THGLineScanning) == 0;
-
-    static ofstream csvFile_THGLineScanning(filename_THGLineScanning, ios::app);
-    if (fileIsEmpty_THGLineScanning) {
-        csvFile_THGLineScanning << "timestamp_ms,"
-            << "t,"
-            << "voltageLevel[V],"
-            << "THGsignal,"
-            << "robotPos_x[m],robotPos_y[m],robotPos_z[m],"
-            << "directionAlongSegment,"
-            << "distanceToLine,"
-           /* << "perpendicularDirectionToLine_x,"*/
-            << "pointA_HapticFrame_x,"
-            << "pointA_HapticFrame_y,"
-            << "pointA_HapticFrame_z,"
-            << "pointB_HapticFrame_x,"
-            << "pointB_HapticFrame_y,"
-            << "pointB_HapticFrame_z,"
-            << "virtualRobotPos_HapticFrame_x,"
-            << "virtualRobotPos_HapticFrame_y,"
-            << "virtualRobotPos_HapticFrame_z,"
-			<< "ForceFeedback_x,"
-			<< "ForceFeedback_y,"
-			<< "ForceFeedback_z,"
-			<< "ForceFeedback_magnitude,"
-            << "dir_perp_x," 
-            << "dir_perp_y," 
-            << "dir_perp_z," 
-            << "dir_perp_filtered_x," 
-            << "dir_perp_filtered_y,"
-            << "dir_perp_filtered_z" 
-            /*<< "robotPos_HapticFrame_x,"
-            << "robotPos_HapticFrame_y,"
-            << "robotPos_HapticFrame_z"*/
-            << endl;
-    }
-
-    // Nom du quatrième fichier 
-    ostringstream ossTHGAutoScan;
-	ossTHGAutoScan << folderTHGAutoScan
-        << "THGAutoScan_"
-        << put_time(now, "%Y-%m-%d_%H-%M-%S")
-        << ".csv";
-
-    const string filename_THGAutoScan = ossTHGAutoScan.str();
-
-    bool fileIsEmpty_THGAutoScan = !fs::exists(filename_THGAutoScan) || fs::file_size(filename_THGAutoScan) == 0;
-
-    static ofstream csvFile_THGAutoScan(filename_THGAutoScan, ios::app);
-    if (fileIsEmpty_THGAutoScan) {
-        csvFile_THGAutoScan << "timestamp_ms,"
-            << "t,"
-            << "voltageLevel[V],"
-            << "THGsignal,"
-            /*<< "robotPos_x[m],robotPos_y[m],robotPos_z[m],"*/
-            << "directionAlongSegment"
-            //<< "distanceToLine,"
-            ///* << "perpendicularDirectionToLine_x,"*/
-            //<< "pointA_HapticFrame_x,"
-            //<< "pointA_HapticFrame_y,"
-            //<< "pointA_HapticFrame_z,"
-            //<< "pointB_HapticFrame_x,"
-            //<< "pointB_HapticFrame_y,"
-            //<< "pointB_HapticFrame_z,"
-            //<< "virtualRobotPos_HapticFrame_x,"
-            //<< "virtualRobotPos_HapticFrame_y,"
-            //<< "virtualRobotPos_HapticFrame_z"
-            << endl;
-    }
-
-    ////Nom du cinquième fichier csv
-    //ostringstream ossZScan;
-    //ossZScan << folderZScan
-    //    << "leica_objective_testSample"
-    //    << put_time(now, "%Y-%m-%d_%H-%M-%S")
-    //    << ".csv";
-
-    //const string filename_ZScan = ossZScan.str();
-
-    //bool fileIsEmpty_ZScan = !fs::exists(filename_ZScan) || fs::file_size(filename_ZScan) == 0;
-
-    //static ofstream csvFile_ZScan(filename_ZScan, ios::app);
-    //if (fileIsEmpty_ZScan) {
-    //    csvFile_ZScan 
-    //        << "voltageLevel[V],"
-    //        << "robotPos_z[m]"
-    //        << endl;
-    //}
-
-    //Nom du cinquième fichier csv
-    ostringstream ossZScan;
-    ossZScan << folderZScan
-        << "glassSample"
-        << put_time(now, "%Y-%m-%d_%H-%M-%S")
-        << ".csv";
-
-    const string filename_ZScan = ossZScan.str();
-
-    bool fileIsEmpty_ZScan = !fs::exists(filename_ZScan) || fs::file_size(filename_ZScan) == 0;
-
-    /*static ofstream csvFile_ZScan(filename_ZScan, ios::app);
-    if (fileIsEmpty_ZScan) {
-        csvFile_ZScan
-            << "voltageLevel[V],"
-            << "robotPos_z[m]"
-            << endl;
-    }*/
-
-    static ofstream csvFile_ZScan(filename_ZScan, ios::app);
-    if (fileIsEmpty_ZScan) {
-        csvFile_ZScan
-            << "voltageLevel[V],"
-            << "robotPos_z[m]"
-            << endl;
-    }
-
-
-
-    //cVector3d Fz_stiff(0.0, 0.0, 0.0);  /////////////////////////////////////////////////
-
     // main haptic control loop
     while (simulationRunning)
     {
@@ -2104,8 +1635,6 @@ void updateHapticDevice(void)
         // get current position of haptic device
         cVector3d hapticPos(0, 0, 0);
         hapticDevice->getPosition(hapticPos);
-
-        /*cout << "position du robot haptique" << hapticPos << endl;*/
 
         // get current velocity of haptic device
         cVector3d hapticVel(0, 0, 0);
@@ -2121,13 +1650,13 @@ void updateHapticDevice(void)
         bool userButton = userButton0 | userButton1;
 
         
-		//  Get the positon of the manipulating robot from the buffer  ///////////////////////
+		//  Get the positon of the manipulating robot from the buffer  
         Vec3 robotPos;
         Vec3* src = active.load(memory_order_acquire);
         robotPos = *src; 
 
         
-		// THG_signal_normalization (max value depends on the scale factor) /////////////////////
+		// THG_signal_normalization (max value depends on the scale factor --> TO ADAPT depending on the input power) 
         double min_voltage = 0.047;
         double max_voltage = 0.0;
 
@@ -2146,20 +1675,6 @@ void updateHapticDevice(void)
             THGsignal = 0.0;
         }
 
-        ////------- Dynamic adjustment of the scale factor -------//  TO TEST !!!  --> ca marche pas ca switch direct !!
-
-        //if (scaleFactor == 0.02 and THGsignal >= 0.5) {
-        //    cout << "smaller scale factor for fine exploration" << endl;
-        //    scaleFactor = 0.001;
-        //}
-
-        //else if (scaleFactor == 0.001 and THGsignal == 0) {
-        //    cout << "bigger scale factor to find the interface" << endl;
-        //    scaleFactor = 0.02;
-        //}
-
-        //// ------ END OF Dynamic adjustment of the scale factor -------//
-
         //--------------------------------------------------------------------------
         // STATE MACHINE
         //--------------------------------------------------------------------------
@@ -2176,28 +1691,6 @@ void updateHapticDevice(void)
         if (state == STATE_IDLE)
         {
 
-            /*zPosDesired = hapticPos.z();
-
-            idlePeriod = 1;*/
-
-            //auto now_time = chrono::steady_clock::now();
-            //long long timestamp_ms = chrono::duration_cast<chrono::milliseconds>(now_time.time_since_epoch()).count();
-
-            //// Écriture d'une ligne CSV avec les variables demandées
-            //csvFile << timestamp_ms << ","
-            //    << hapticPos.x() << ","
-            //    << hapticPos.y() << ","
-            //    << hapticPos.z() << ","
-            //    << zPosDesired << ","
-            //    << voltageLevel << ","
-            //    << THGsignal << ","
-            //    << lastTHGsignal << ","
-            //    << Fz_stiff.z() << "," // on ne logge que la composante Z de la force de raideur
-            //    << idlePeriod
-            //    << endl;
-
-            //csvFile.flush();
-
             // check if user has pressed the button
             if (userButton == true)
             {
@@ -2205,88 +1698,11 @@ void updateHapticDevice(void)
                 robotPosDes0 = robotPosDes;
                 hapticPos0 = hapticPos;
 
-                zPosDesired = hapticPos.z();
-
-                idlePeriod = 1;
-
                 // get current position of robot device
                 robotDevice->getPosition(robotPos0);
 
-                //auto now_time = chrono::steady_clock::now();
-                //long long timestamp_ms = chrono::duration_cast<chrono::milliseconds>(now_time.time_since_epoch()).count();
-
-                //// Écriture d'une ligne CSV avec les variables demandées
-                //csvFile << timestamp_ms << ","
-                //    << hapticPos.x() << ","
-                //    << hapticPos.y() << ","
-                //    << hapticPos.z() << ","
-                //    << zPosDesired << ","
-                //    << voltageLevel << ","
-                //    << THGsignal << ","
-                //    << lastTHGsignal << ","
-                //    << Fz_stiff.z() << "," // on ne logge que la composante Z de la force de raideur
-                //    << idlePeriod
-                //    << endl;
-
-                //csvFile.flush();
-
                 // go into teleoperation mode
                 state = STATE_TELEOPERATION;
-            }
-
-            if ( scan_x == true || scan_y == true) {   // log data during scanning 
-                 
-                if (scan_x == true) {
-					directionAlongSegment = 1;
-                }
-                else if (scan_y == true) {
-                    directionAlongSegment = -1;
-				}
-
-                // Convert robotPos in Vec3
-
-				/*Vec3 robotPos_Vec3(robotPos.x(), robotPos.y(), robotPos.z());*/
-
-				/*double t = computeT(robotPos_Vec3, list_of_interface_points[0], list_of_interface_points[1]);*/
-
-                double t = 0.0;
-
-				auto now_time_autoscan = chrono::steady_clock::now();
-				long long timestamp_ms_autoscan = chrono::duration_cast<chrono::milliseconds>(now_time_autoscan.time_since_epoch()).count();
-
-                csvFile_THGAutoScan << timestamp_ms_autoscan << ","
-                    << t << ","
-                    << voltageLevel << ","
-                    << THGsignal << ","
-                    << directionAlongSegment
-                    //<< distanceToLine << ","
-                    ///*<< perpendicularDirectionToLine.x() << ","*/
-                    //<< pointA_HapticFrame.x() << ","
-                    //<< pointA_HapticFrame.y() << ","
-                    //<< pointA_HapticFrame.z() << ","
-                    //<< pointB_HapticFrame.x() << ","
-                    //<< pointB_HapticFrame.y() << ","
-                    //<< pointB_HapticFrame.z() << ","
-                    //<< virtualRobotPos.x() << ","
-                    //<< virtualRobotPos.y() << ","
-                    //<< virtualRobotPos.z()
-					<< endl;
-			}
-
-           /* if (scan_z == true) {
-                csvFile_ZScan
-                    << voltageLevel << ","
-                    << robotPos.z()
-                    << endl;
-
-            }*/
-
-            if (scan_z == true) {
-                csvFile_ZScan
-                    << voltageLevel << ","
-                    << robotPos.z()
-                    << endl;
-
             }
 
 
@@ -2300,19 +1716,14 @@ void updateHapticDevice(void)
 
             if (userButton == false)
             {
+
                 // user has released button, go into idle mode
-				lastVirtualRobotPos = virtualRobotPos;
-               /* cout << "lastVirtualRobotPos = " << lastVirtualRobotPos << endl;*/
                 state = STATE_IDLE;
             }
             else
             {
                 // compute new desired robot position based on new haptic device position and axis locking conditions
                 if (!(lock_x || lock_y || lock_z)) {
-
-                    /*if (haptic_state != LINEAR_EXPLORATION) {
-                        robotPosDes = robotPosDes0 + scaleFactor * (hapticPos - hapticPos0);
-                    }*/
 
                     robotPosDes = robotPosDes0 + scaleFactor * (hapticPos - hapticPos0);
                 }
@@ -2358,27 +1769,22 @@ void updateHapticDevice(void)
                 //// damping
                 force += -Kv * hapticVel;
 
-                // ----------------------------------------- TEST NEW HAPTIC MODEL ------------------------------------------- //
+                // ----------------------------------------- NEW HAPTIC MODEL ------------------------------------------- //
 
                 if (haptic_state == FIND_INTERFACE) {
 
-                    interface_point_taken = 0;
-                    find_interface = 1;
 
                     // damping force to help find the interface
-
                     double z_damping = 70 * pow(THGsignal, 3);
                     double xy_damping = 70 * (1 - pow(THGsignal, 3));
 
-                    // force normale (vers le haut, opposée au mouvement en Z)
+                    // normal force
                     cVector3d F_normal(0.0, 0.0, -z_damping * hapticVel.z());
 
-                    // force tangentielle (résistance ou glissement)
+                    // tangeantial force
                     cVector3d F_tangent(-xy_damping * hapticVel.x(), -xy_damping * hapticVel.y(), 0.0);
 
-                    //cout << F_normal << endl;
-                    //cout << F_tangent << endl;
-
+                    // during fast positionning, we are far from the interface --> no force feedback
                     if (scaleFactor == 0.2) {
                         F_normal.x(0.0);
                         F_normal.y(0.0);
@@ -2391,79 +1797,30 @@ void updateHapticDevice(void)
 
                     force += F_normal + F_tangent;
 
-                    // ------- AJOUT STIFFNESS JUSTE POUR AIDER DANS LE PREMIER STATE (mais dans l'idée, il faut trouver une autre méthode)
-                    
-                    //double kz_stiff = 700;  // stiffness proportionnal to the THG level
-
-                    ///*if (scaleFactor == 0.02) {
-                    //    kz_stiff = 50;
-                    //}*/
-
-                    //if (THGsignal < 0.2) {    // if the THG signal is low we don't want stiffness feedback
-                    //    zPosDesired = hapticPos.z();
-                    //}
-
-                    //if (scaleFactor == 0.02) {
-                    //    zPosDesired = hapticPos.z();  /// TEST TO REMOVE THAT
-                    //}
-
-                    //if (THGsignal > lastTHGsignal) {  // Increase in the signal means that we are closer to the interface -> we update the z position desired
-
-                    //    zPosDesired = hapticPos.z();   // A DECLARER EN VARIABLE GLOBALE !!!
-                    //    /*cout << "THG signal: " << THGsignal << endl;
-                    //    cout << "Last THG signal: " << lastTHGsignal << endl;
-                    //    cout << "Voltage level: " << voltageLevel << endl;
-                    //    cout << "z PosDesired: " << zPosDesired << endl;*/
-                    //    lastTHGsignal = THGsignal;
-                    //    /*cout << "test";*/
-
-                    //}
-
-                    //cVector3d Fz_stiff(0.0, 0.0, -kz_stiff * (hapticPos.z() - zPosDesired));
-
-                    /*force += Fz_stiff;*/
-
-                    // -----------------------------------------------------------------------------------------------------------------------
-
                     // Store the points that corresponds to an interface point --> Take the position of the manipulating robot
-                    if (voltageLevel > 0.5) { //max value to adapt
+                    if (voltageLevel > 0.5) { //max value TO ADAPT
 
-                        Vec3 interface_point = { robotPos.x(),robotPos.y(),robotPos.z() };  // A CHANGER AVEC LE BUFFER!!!!!
-                        
-                        double minDistance = 0.0005; // 0.1mm TO ADAPT
+                        Vec3 interface_point = { robotPos.x(),robotPos.y(),robotPos.z() };
+
+                        double minDistance = 0.0005; //TO ADAPT
 
                         if (isFarEnough(list_of_interface_points, interface_point, minDistance)) {
 
                             cout << "Interface point detected at voltage: " << voltageLevel << " V and position ( " << robotPos.x() << ", " << robotPos.y() << ", " << robotPos.z() << " )" << endl;
                             list_of_interface_points.emplace_back(robotPos.x(), robotPos.y(), robotPos.z());
-                            interface_point_taken = 1;
                         }
 
                     }
 
-                    // If enough interface points --> planar approximation + next state
-
-                    if (list_of_interface_points.size() >= 2) { // threshold value to adpat
+                    // If enough interface points --> linear approximation + next state
+                    if (list_of_interface_points.size() >= 2) {
 
                         cout << "Enough interface points collected: " << list_of_interface_points.size() << " points." << endl;
 
                         PointA = list_of_interface_points[0];
                         PointB = list_of_interface_points[1];
 
-
-						//// ----- For planar approcimation ----- //
-      //                  fitPlaneSVD(list_of_interface_points, centroid, normal, singularValues);
-      //                  planeBasis(normal, u, v);
-
-      //                  // debugging output
-      //                  std::cout << "Centroid: " << centroid.transpose() << "\n";
-      //                  std::cout << "Normal (unit): " << normal.transpose() << "\n";
-      //                  std::cout << "Singular values: " << singularValues.transpose() << "\n";
-      //                  std::cout << "Plane basis u: " << u.transpose() << "\n";
-      //                  std::cout << "Plane basis v: " << v.transpose() << "\n\n";
-						//// ------------------------------------ //
-
-                        // change haptic state
+                        // Change to the next haptic state
                         haptic_state = LINEAR_EXPLORATION;
                         find_interface = 0;
 
@@ -2472,63 +1829,25 @@ void updateHapticDevice(void)
 
                 else if (haptic_state == LINEAR_EXPLORATION) {
 
-                    interface_point_taken = 0;
+                    virtualRobotPos = robotPos + scaleFactor * (hapticPos - hapticPos0);
 
-                    if (planar_exploration == 0) {
-                        cout << "Beginning of planar exploration" << endl;
-                    }
+                    double correction_factor = 0.7;
 
-                    planar_exploration = 1;
+                    // -------------------- Correction of the virtual robot position to match the real one ------------------- //
+                    virtualRobotPos += correction_factor * (robotPos - virtualRobotPos);
 
-                    // ----- Transformation de tout ce dont on a besoin dans le repère du haptic device ---- //
-
-                    /*cVector3d robotPos_HapticFrame = robotRot * robotPos;*/
-
-                    cVector3d A_HapticFrame = robotRot * cVector3d(list_of_interface_points[0][0], list_of_interface_points[0][1], list_of_interface_points[0][2]);
-                    cVector3d B_HapticFrame = robotRot * cVector3d(list_of_interface_points[1][0], list_of_interface_points[1][1], list_of_interface_points[1][2]);
-
-                    // ------------------- CONVERSION EN VEC3 POUR UTILISER LES FONCTIONS DE EIGEN ---------------- //
-
-                    Vec3 A_HapticFrame_Vec3(A_HapticFrame.x(), A_HapticFrame.y(), A_HapticFrame.z());
-                    Vec3 B_HapticFrame_Vec3(B_HapticFrame.x(), B_HapticFrame.y(), B_HapticFrame.z());
-
-                    /*Vec3 robotPos0_Vec3(robotPos0.x(), robotPos0.y(), robotPos0.z());*/
-
-                    // ------------------- Compute virtual position of the manipulating robot in the haptic frame ---------------- //
-
-					/*cVector3d virtualRobotPos(0, 0, 0);*/  // A DECLARER EN GLOBAL ?????
-
-     //               if (lastVirtualRobotPos.x() == 0 && lastVirtualRobotPos.y() == 0 && lastVirtualRobotPos.z() == 0) {
-     //                   /*cout << "Première virtual robot pos" << endl;*/
-     //                   virtualRobotPos = robotRot * robotPos0 + scaleFactor * (hapticPos - hapticPos0);
-					//}
-     //               else {
-     //                   virtualRobotPos = lastVirtualRobotPos + scaleFactor * (hapticPos - hapticPos0);
-     //               }
-
-                   virtualRobotPos = robotPos + scaleFactor * (hapticPos - hapticPos0);
-
-       //            double correction_factor = 0.7;
-
-				   //// -------------------- Correction of the virtual robot position to match the real one ------------------- //
-				   //virtualRobotPos += correction_factor * (robotPos - virtualRobotPos);
-       //          
-
-                    // ------------------- CONVERSION EN VEC3 POUR UTILISER LES FONCTIONS DE EIGEN ---------------- //
+                    //conversion in Vec3 to use eigen functions
                     Vec3 virtualRobotPos_Vec3(virtualRobotPos.x(), virtualRobotPos.y(), virtualRobotPos.z());
-                   
 
-                   /* cout << "vitrualRobtoPos_Vec3" << virtualRobotPos_Vec3 << endl;*/
+                    // Compute haptic force to follow the line defined by points A and B
+                    double dist_perp = distanceToLine(virtualRobotPos_Vec3, PointA, PointB);
+                    Vec3 dir_perp = perpendicularDirectionToLine(virtualRobotPos_Vec3, PointA, PointB);
 
-					// Compute haptic force to follow the line defined by points A and B
-                    double dist_perp = distanceToLine(virtualRobotPos_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3);
-                    Vec3 dir_perp = perpendicularDirectionToLine(virtualRobotPos_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3);
+                    // Exponential filtering of dir perp
 
-					// ------------------ Lissage de dir_perp pour éviter les petites oscillations ------------------ //
+                    double alpha = 0.5; //TO ADAPT
 
-                    double alpha = 0.5; // à ajuster
-
-					Vec3 dir_perp_filtered;
+                    Vec3 dir_perp_filtered;
 
                     if (!dir_perp_initialized) {
                         last_dir_perp_filtered = dir_perp;
@@ -2540,189 +1859,37 @@ void updateHapticDevice(void)
                         if (dir_perp_filtered.norm() > 1e-6)
                             dir_perp_filtered.normalize();
 
-						last_dir_perp_filtered = dir_perp_filtered;
+                        last_dir_perp_filtered = dir_perp_filtered;
                     }
 
-                    dir_perp_filtered = dir_perp;
+					//// if we don't want to use filtering
+     //               dir_perp_filtered = dir_perp;
 
-					// --------------------------------------------------------------------------------------------- //
-                    
-
-                    double t = computeT(virtualRobotPos_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3); // just for plotting
-
-					// Direction vector of the line AB
-                    Vec3 AB = B_HapticFrame_Vec3 - A_HapticFrame_Vec3;
-                    Vec3 uAB = AB.normalized();
 
                     // Stiffness & damping
-                    double K_line = 700/scaleFactor;
+                    double K_line = 700 / scaleFactor;
                     double B_line = 100;
 
                     // Vitesse perpendiculaire : projeter la vitesse sur la direction perpendiculaire
                     Vec3 V(hapticVel.x(), hapticVel.y(), hapticVel.z());
                     double vel_normal = V.dot(dir_perp_filtered);
 
-					// Projeter la vitesse sur la direction de la ligne
-                    double velAlong = V.dot(uAB);
-
-                    // 4. Mise à jour de l’état global
-                    if (velAlong > 1e-6) {
-                        directionAlongSegment = +1;  // l'utilisateur va vers B
-                    }
-                    else if (velAlong < -1e-6) {
-                        directionAlongSegment = -1;  // l'utilisateur va vers A
-                    }
-                    else {
-                        directionAlongSegment = 0;   // immobile ou mouvement transversal
-                    }
-
                     // Force haptique perpendiculaire
                     Vec3 F_perp = -K_line * dist_perp * dir_perp_filtered - B_line * vel_normal * dir_perp_filtered;
 
-					double force_magnitude = F_perp.norm();
+                    double force_magnitude = F_perp.norm();
 
                     // Conversion vers CHAI3D
                     cVector3d F_line_haptic(F_perp[0], F_perp[1], F_perp[2]);
                     force += F_line_haptic;
 
-					// ------ Compute desired robot position (project the movement of the haptic device to the line AB) ------ //
-
-					/*cVector3d hapticMovement = hapticPos - hapticPos0; 
-					Vec3 hapticMovement_Vec3(hapticMovement.x(), hapticMovement.y(), hapticMovement.z());
-
-					Vec3 projectedHapticMovement_Vec3 = projectVectorToLine(hapticMovement_Vec3, A_HapticFrame_Vec3, B_HapticFrame_Vec3);
-
-					cVector3d projectedHapticMovement(projectedHapticMovement_Vec3[0], projectedHapticMovement_Vec3[1], projectedHapticMovement_Vec3[2]);
-
-					robotPosDes = robotPosDes0 + scaleFactor * projectedHapticMovement;*/
-
-					// ----------------------------------------------------------------------------------------------------- //
-
-
-
-                    //log_counter++;
-
-                    //if (log_counter % 100 == 0) {   // Downsampling 
-
-
-                    
-                    // Log data about line forces for debugging
-                    auto now_time_line = chrono::steady_clock::now();
-                    long long timestamp_ms_line = chrono::duration_cast<chrono::milliseconds>(now_time_line.time_since_epoch()).count();
-
-                    csvFile_THGLineScanning << timestamp_ms_line << ","
-                        << t << ","
-                        << voltageLevel << ","
-                        << THGsignal << ","
-                        << robotPos.x() << ","
-                        << robotPos.y() << ","
-                        << robotPos.z() << ","
-                        << directionAlongSegment << ","
-                        << dist_perp << ","
-                        /*<< dir_perp << ","*/    // ATTENTION --> IL FAUT DIFFERENCIER X Y ET Z SINON BUG DANS LE CSV
-                        << A_HapticFrame.x() << ","
-                        << A_HapticFrame.y() << ","
-                        << A_HapticFrame.z() << ","
-                        << B_HapticFrame.x() << ","
-                        << B_HapticFrame.y() << ","
-                        << B_HapticFrame.z() << ","
-                        << virtualRobotPos.x() << ","
-                        << virtualRobotPos.y() << ","
-                        << virtualRobotPos.z() << ","
-						<< F_perp[0] << ","
-						<< F_perp[1] << ","
-						<< F_perp[2] << ","
-                        << force_magnitude << ","
-                        << dir_perp[0] << ","
-                        << dir_perp[1] << ","
-                        << dir_perp[2] << ","
-                        << dir_perp_filtered[0] << ","
-                        << dir_perp_filtered[1] << ","
-                        << dir_perp_filtered[2] 
-                        /*<< robotPos_HapticFrame.x() << ","
-                        << robotPos_HapticFrame.y() << ","
-                        << robotPos_HapticFrame.z()*/
-                        << endl;
-
-                    // forcer le flush pour sauvegarder en temps réel
-                    csvFilePlane.flush();
-                    
-
-                  
 
 
                 }
 
-    
-                    auto now_time = chrono::steady_clock::now();
-                    long long timestamp_ms = chrono::duration_cast<chrono::milliseconds>(now_time.time_since_epoch()).count();
 
-                    //// Écriture d'une ligne CSV avec les variables demandées
-                    //csvFile << timestamp_ms << ","
-                    //    << hapticPos.x() << ","
-                    //    << hapticPos.y() << ","
-                    //    << hapticPos.z() << ","
-                    //    << zPosDesired << ","
-                    //    << voltageLevel << ","
-                    //    << THGsignal << ","
-                    //    << lastTHGsignal << ","
-                    //    << Fz_stiff.z() << "," // on ne logge que la composante Z de la force de raideur
-                    //    << idlePeriod
-                    //    << endl;
-
-                    // Écriture d'une ligne CSV avec les variables demandées
-                    csvFile << timestamp_ms << ","
-                        << hapticPos.x() << ","
-                        << hapticPos.y() << ","
-                        << hapticPos.z() << ","
-                        /*<< robotPos.x() << ","
-                        << robotPos.y() << ","
-                        << robotPos.z() << ","*/
-                        << voltageLevel << ","
-                        << THGsignal << ","
-                        << interface_point_taken << ","
-                        << find_interface << ","
-                        << planar_exploration << ","
-                        << idlePeriod
-                        << endl;
-
-
-                    //csvFile.flush();
-
-                    //if (idlePeriod == 1) {
-                    //    idlePeriod = 0;
-                    //}
-
-
-                    ////////////////////////// ------ DANIEL'S CODE ------ ////////////////////////////  --> for the moment to use for haptic state 1 BUT TO ADAPT
-
-        //            //// compute spring force to resist movement on haptic side if robot has not moved to that position
-        //            //force = Kp * (robotPosCur - robotPosDes);
-
-        //            // compute a viscous force based of the laser sensor dat
-        //            double Kv_thg = 100;
-
-        //            // set damping factor based of hapticDampingFactor value computed in laser sensor thread; the value
-        //            // is clamped between 0.0 and 1.0 to avoid any instabilities from the haptic dev
-        //            double damping = cClamp(hapticDampingFactor, 0.0, 1.0);
-                    //// calculate damping force as proportional de haptic device velocity; add force to previously computed force --> test to remove hapticVel.length() in the denominator
-        //            force += -cClamp( Kv_thg * pow(voltageLevel,3)/ hapticVel.length(),0.0, 30.0)*hapticVel;
-
-        //            // compute a force based on the 3d gradient of the signal  -> I THINK THIS IS NOT USED (EQUAL TO ZERO)
-        //            double Kg = 1;
-        //            cVector3d unitGradient(0,0,0);
-        //            if (gradient.length() > 0) unitGradient = gradient / gradient.length();
-        //            force += -cClamp(Kg * voltageLevel * gradient.length(), -30.0, 30.0)* unitGradient;
-
-
-        //            // compute a force based on the difference of signal after a given displacement.
-        //            double Ki = 3;
-        //            cVector3d unitVel(hapticVel/hapticVel.length());
-        //            force += Ki*signalDiff* unitVel.length();
-
-
-                }
             }
+        }
 
 
             //////////////////////////////////////////////////////////////////////////////////////////////
@@ -2755,20 +1922,9 @@ void updateHapticDevice(void)
             // apply force to haptic device
             hapticDevice->setForce(force);
 
-            //if (abs(lastVoltageLevel - voltageLevel) > 0.015) {      //we update the value only if the change is significant (15mV)
-            //    lastTHGsignal = THGsignal; // A METTRE EN VARIABLE GLOBALE !!!
-            //}
-            // 
-
-            //lastTHGsignal = THGsignal; // A METTRE EN VARIABLE GLOBALE !!!
-
             // update frequency counter
             freqCounterHapticDevice.signal();
-        }
-
-        csvFile.close();
-
-        
+        }     
 
         // close connection to haptic device
         hapticDevice->close();
@@ -2836,13 +1992,11 @@ void auto_scan(void) {
  
         }
         i++;
-        if (scan_x) scan_vector.set(0.1 * microns, 0, 0);
-        else if (scan_y) scan_vector.set(-0.1 * microns, 0, 0);
-        else if (scan_z) scan_vector.set(0, 0, 0.1 * microns);  // ---------------- ATTENTION J'AI TRANSFORMÉ SCAN Y EN SCAN -X --------------------------- //
+        if (scan_x) scan_vector.set(0.01 * microns, 0, 0);
+        else if (scan_y) scan_vector.set(0, 0.01 * microns, 0);
+        else if (scan_z) scan_vector.set(0, 0, 0.01 * microns);  
         robotPosDes = robotPosDes + scan_vector;
-        //cout <<"x: " << robotPosCur.x() << ", y:  " << robotPosCur.y() << ",z : " << robotPosCur.z() << endl;
     }
-    //cout << "x: " << robotPosCur.x() << ", y:  " << robotPosCur.y() << ",z : " << robotPosCur.z() << endl;
     return;
 }
 
