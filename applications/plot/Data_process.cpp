@@ -217,3 +217,165 @@ cVector3d computeSignalDif(cVector3d currentRobotPosition, double current_voltag
     }
     return position_diff;
 }
+
+// ============================
+// LowPassFilter
+// ============================
+
+LowPassFilter::LowPassFilter(double alpha)
+    : alpha(alpha), initialized(false), y(0.0) {
+}
+
+double LowPassFilter::apply(double x) {
+    if (!initialized) {
+        y = x;
+        initialized = true;
+    }
+    else {
+        y = alpha * x + (1.0 - alpha) * y;
+    }
+    return y;
+}
+
+// ============================
+// LowPassFilter
+// ============================
+
+LowPassFilter::LowPassFilter(double alpha)
+    : alpha(alpha), initialized(false), y(0.0) {
+}
+
+double LowPassFilter::apply(double x) {
+    if (!initialized) {
+        y = x;
+        initialized = true;
+    }
+    else {
+        y = alpha * x + (1.0 - alpha) * y;
+    }
+    return y;
+}
+
+// ============================
+// Plane fitting
+// ============================
+
+void fitPlaneSVD(const std::vector<Vec3>& points,
+    Vec3& centroid,
+    Vec3& normal,
+    Vec3& singularValues)
+{
+    if (points.size() < 3)
+        throw std::runtime_error("at least 3 points needed");
+
+    centroid.setZero();
+    for (const auto& p : points)
+        centroid += p;
+    centroid /= double(points.size());
+
+    MatX X(points.size(), 3);
+    for (size_t i = 0; i < points.size(); ++i) {
+        X.row(i) = (points[i] - centroid).transpose();
+    }
+
+    Eigen::JacobiSVD<MatX> svd(X, Eigen::ComputeThinU | Eigen::ComputeThinV);
+    singularValues = svd.singularValues();
+
+    Eigen::Matrix3d V = svd.matrixV();
+    normal = V.col(2);
+    normal.normalize();
+}
+
+double signedDistanceToPlane(const Vec3& point,
+    const Vec3& centroid,
+    const Vec3& normal)
+{
+    return normal.dot(point - centroid);
+}
+
+Vec3 projectPointToPlane(const Vec3& point,
+    const Vec3& centroid,
+    const Vec3& normal)
+{
+    double d = signedDistanceToPlane(point, centroid, normal);
+    return point - d * normal;
+}
+
+void planeBasis(const Vec3& normal,
+    Vec3& u,
+    Vec3& v)
+{
+    Vec3 n = normal.normalized();
+    Vec3 tmp = (std::abs(n.x()) < 0.9) ? Vec3(1, 0, 0) : Vec3(0, 1, 0);
+    u = n.cross(tmp).normalized();
+    v = n.cross(u).normalized();
+}
+
+// ============================
+// Line geometry
+// ============================
+
+Vec3 projectPointToLine(const Vec3& P,
+    const Vec3& A,
+    const Vec3& B)
+{
+    Vec3 AB = B - A;
+    double t = (P - A).dot(AB) / AB.dot(AB);
+    return A + t * AB;
+}
+
+Vec3 projectVectorToLine(const Vec3& vector,
+    const Vec3& A,
+    const Vec3& B)
+{
+    Vec3 AB = B - A;
+    return (vector.dot(AB) / AB.dot(AB)) * AB;
+}
+
+double distanceToLine(const Vec3& P,
+    const Vec3& A,
+    const Vec3& B)
+{
+    return (P - projectPointToLine(P, A, B)).norm();
+}
+
+Vec3 vectorToLine(const Vec3& P,
+    const Vec3& A,
+    const Vec3& B)
+{
+    return P - projectPointToLine(P, A, B);
+}
+
+Vec3 perpendicularDirectionToLine(const Vec3& P,
+    const Vec3& A,
+    const Vec3& B)
+{
+    Vec3 d = vectorToLine(P, A, B);
+    double n = d.norm();
+    return (n < 1e-9) ? Vec3::Zero() : d / n;
+}
+
+double computeT(const Vec3& P,
+    const Vec3& A,
+    const Vec3& B)
+{
+    Vec3 AB = B - A;
+    double denom = AB.dot(AB);
+    if (denom < 1e-12) return 0.0;
+    return (P - A).dot(AB) / denom;
+}
+
+// ============================
+// Utility
+// ============================
+
+bool isFarEnough(const std::vector<Vec3>& points,
+    const Vec3& newPoint,
+    double threshold)
+{
+    for (const auto& p : points) {
+        if ((p - newPoint).norm() < threshold)
+            return false;
+    }
+    return true;
+}

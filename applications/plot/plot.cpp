@@ -18,7 +18,7 @@
 #include <tuple>
 #include <vector>
 #include <algorithm>
-#include <array> // Include array for array
+#include <array> 
 #include "tetgen.h"
 #include "test_sample.h"
 #include <filesystem>
@@ -362,7 +362,7 @@ private:
 
 // Fit a plane to points using SVD. Returns centroid, unit normal, singular values.
 void fitPlaneSVD(const std::vector<Vec3>& points, Vec3& centroid, Vec3& normal, Vec3& singularValues) {
-    if (points.size() < 3) throw std::runtime_error("Au moins 3 points requis.");
+    if (points.size() < 3) throw std::runtime_error("at least 3 points needed");
     centroid.setZero();
     for (const auto& p : points) centroid += p;
     centroid /= double(points.size());
