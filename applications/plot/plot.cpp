@@ -323,80 +323,80 @@ void reset_sample();
 cVector3d gradient(0, 0, 0);
 cVector3d signalDiff(0, 0, 0);
 
-// Added classes and functions ------------------------------------------
-
-
-class LowPassFilter {
-public:
-    LowPassFilter(double alpha = 0.1) : alpha(alpha), initialized(false), y(0.0) {}
-
-    double apply(double x) {
-        if (!initialized) {
-            y = x;
-            initialized = true;
-        }
-        else {
-            y = alpha * x + (1.0 - alpha) * y;
-        }
-        return y;
-    }
-
-private:
-    double alpha;       // 0 < alpha < 1
-    bool initialized;
-    double y;
-};
-
-// Fit a plane to points using SVD. Returns centroid, unit normal, singular values.
-void fitPlaneSVD(const std::vector<Vec3>& points, Vec3& centroid, Vec3& normal, Vec3& singularValues) {
-    if (points.size() < 3) throw std::runtime_error("Au moins 3 points requis.");
-    centroid.setZero();
-    for (const auto& p : points) centroid += p;
-    centroid /= double(points.size());
-    MatX X(points.size(), 3);
-    for (size_t i = 0; i < points.size(); ++i) {
-        Vec3 v = points[i] - centroid;
-        X.row(i) = v.transpose();
-    }
-
-    // SVD
-    Eigen::JacobiSVD<MatX> svd(X, Eigen::ComputeThinU | Eigen::ComputeThinV);
-    singularValues = svd.singularValues();
-    // V columns are principal components. The normal = last column of V (smallest singular value)
-    Eigen::Matrix3d V = svd.matrixV();
-	normal = V.col(2); // column corresponding to smallest variance
-    normal.normalize();
-}
-
-// Signed distance from point to plane
-double signedDistanceToPlane(const Vec3& point, const Vec3& centroid, const Vec3& normal) {
-    return normal.dot(point - centroid);
-}
-
-// Orthogonal projection of a point onto the plane
-Vec3 projectPointToPlane(const Vec3& point, const Vec3& centroid, const Vec3& normal) {
-    double d = signedDistanceToPlane(point, centroid, normal);
-    return point - d * normal;
-}
-
-// Build two orthonormal basis vectors u, v lying in the plane
-void planeBasis(const Vec3& normal, Vec3& u, Vec3& v) {
-    Vec3 n = normal.normalized();
-    Vec3 tmp;
-    if (std::abs(n.x()) < 0.9) tmp = Vec3(1, 0, 0);
-    else tmp = Vec3(0, 1, 0);
-    u = n.cross(tmp).normalized();
-    v = n.cross(u).normalized();
-}
-
-bool isFarEnough(const vector<Vec3>& points, const Vec3& newPoint, double threshold) {
-    for (const auto& p : points) {
-        if ((p - newPoint).norm() < threshold) {
-            return false; // too close
-        }
-    }
-	return true; // far enough 
-}
+//// Added classes and functions ------------------------------------------
+//
+//
+//class LowPassFilter {
+//public:
+//    LowPassFilter(double alpha = 0.1) : alpha(alpha), initialized(false), y(0.0) {}
+//
+//    double apply(double x) {
+//        if (!initialized) {
+//            y = x;
+//            initialized = true;
+//        }
+//        else {
+//            y = alpha * x + (1.0 - alpha) * y;
+//        }
+//        return y;
+//    }
+//
+//private:
+//    double alpha;       // 0 < alpha < 1
+//    bool initialized;
+//    double y;
+//};
+//
+//// Fit a plane to points using SVD. Returns centroid, unit normal, singular values.
+//void fitPlaneSVD(const std::vector<Vec3>& points, Vec3& centroid, Vec3& normal, Vec3& singularValues) {
+//    if (points.size() < 3) throw std::runtime_error("Au moins 3 points requis.");
+//    centroid.setZero();
+//    for (const auto& p : points) centroid += p;
+//    centroid /= double(points.size());
+//    MatX X(points.size(), 3);
+//    for (size_t i = 0; i < points.size(); ++i) {
+//        Vec3 v = points[i] - centroid;
+//        X.row(i) = v.transpose();
+//    }
+//
+//    // SVD
+//    Eigen::JacobiSVD<MatX> svd(X, Eigen::ComputeThinU | Eigen::ComputeThinV);
+//    singularValues = svd.singularValues();
+//    // V columns are principal components. The normal = last column of V (smallest singular value)
+//    Eigen::Matrix3d V = svd.matrixV();
+//	normal = V.col(2); // column corresponding to smallest variance
+//    normal.normalize();
+//}
+//
+//// Signed distance from point to plane
+//double signedDistanceToPlane(const Vec3& point, const Vec3& centroid, const Vec3& normal) {
+//    return normal.dot(point - centroid);
+//}
+//
+//// Orthogonal projection of a point onto the plane
+//Vec3 projectPointToPlane(const Vec3& point, const Vec3& centroid, const Vec3& normal) {
+//    double d = signedDistanceToPlane(point, centroid, normal);
+//    return point - d * normal;
+//}
+//
+//// Build two orthonormal basis vectors u, v lying in the plane
+//void planeBasis(const Vec3& normal, Vec3& u, Vec3& v) {
+//    Vec3 n = normal.normalized();
+//    Vec3 tmp;
+//    if (std::abs(n.x()) < 0.9) tmp = Vec3(1, 0, 0);
+//    else tmp = Vec3(0, 1, 0);
+//    u = n.cross(tmp).normalized();
+//    v = n.cross(u).normalized();
+//}
+//
+//bool isFarEnough(const vector<Vec3>& points, const Vec3& newPoint, double threshold) {
+//    for (const auto& p : points) {
+//        if ((p - newPoint).norm() < threshold) {
+//            return false; // too close
+//        }
+//    }
+//	return true; // far enough 
+//}
 
 
 // -------------------------------------------------------------------------    

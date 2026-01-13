@@ -217,3 +217,111 @@ cVector3d computeSignalDif(cVector3d currentRobotPosition, double current_voltag
     }
     return position_diff;
 }
+
+// ============================
+// LowPassFilter
+// ============================
+
+LowPassFilter::LowPassFilter(double alpha)
+    : alpha(alpha), initialized(false), y(0.0) {
+}
+
+double LowPassFilter::apply(double x) {
+    if (!initialized) {
+        y = x;
+        initialized = true;
+    }
+    else {
+        y = alpha * x + (1.0 - alpha) * y;
+    }
+    return y;
+}
+
+
+// ============================
+// Plane fitting
+// ============================
+
+void fitPlaneSVD(const std::vector<Vec3>& points,
+    Vec3& centroid,
+    Vec3& normal,
+    Vec3& singularValues)
+{
+    if (points.size() < 3) {
+        throw std::runtime_error("at least 3 points needed");
+    }
+
+    centroid.setZero();
+    for (const auto& p : points) {
+        centroid += p;
+    }
+    centroid /= static_cast<double>(points.size());
+
+    MatX X(points.size(), 3);
+    for (size_t i = 0; i < points.size(); ++i) {
+        Vec3 v = points[i] - centroid;
+        X.row(i) = v.transpose();
+    }
+
+    Eigen::JacobiSVD<MatX> svd(X, Eigen::ComputeThinU | Eigen::ComputeThinV);
+    singularValues = svd.singularValues();
+
+    Eigen::Matrix3d V = svd.matrixV();
+    normal = V.col(2);
+    normal.normalize();
+}
+
+double signedDistanceToPlane(const Vec3& point,
+    const Vec3& centroid,
+    const Vec3& normal)
+{
+    double d = normal.dot(point - centroid);
+    return d;
+}
+
+Vec3 projectPointToPlane(const Vec3& point,
+    const Vec3& centroid,
+    const Vec3& normal)
+{
+    double d = signedDistanceToPlane(point, centroid, normal);
+    Vec3 projectedPoint = point - d * normal;
+    return projectedPoint;
+}
+
+void planeBasis(const Vec3& normal,
+    Vec3& u,
+    Vec3& v)
+{
+    Vec3 n = normal.normalized();
+    Vec3 tmp;
+
+    if (std::abs(n.x()) < 0.9) {
+        tmp = Vec3(1, 0, 0);
+    }
+    else {
+        tmp = Vec3(0, 1, 0);
+    }
+
+    u = n.cross(tmp);
+    u.normalize();
+
+    v = n.cross(u);
+    v.normalize();
+}
+
+// ============================
+// Utility
+// ============================
+
+bool isFarEnough(const std::vector<Vec3>& points,
+    const Vec3& newPoint,
+    double threshold)
+{
+    for (const auto& p : points) {
+        double dist = (p - newPoint).norm();
+        if (dist < threshold) {
+            return false;
+        }
+    }
+    return true;
+}
